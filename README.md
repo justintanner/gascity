@@ -632,7 +632,7 @@ Every infrastructure operation (gate evaluation, health patrol, bead lifecycle, 
 
 ## License
 
-Apache 2.0
+MIT
 
 ---
 
