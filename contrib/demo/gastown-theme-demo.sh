@@ -101,23 +101,27 @@ pause "Press Enter to apply gastown theme to all live sessions..."
 
 narrate "Applying Theme" --sub "Running tmux-theme.sh and tmux-keybindings.sh on live sessions"
 
-AGENTS=("mayor" "deacon" "demo-rig--witness" "demo-rig--polecat-1")
+# Session names match agent names (per-city socket isolation).
+SESSIONS=("mayor" "deacon" "demo-rig--witness" "demo-rig--polecat-1")
 AGENT_NAMES=("mayor" "deacon" "demo-rig/witness" "demo-rig/polecat-1")
 
-for i in "${!AGENTS[@]}"; do
-    sess="gc-theme-demo-${AGENTS[$i]}"
+# Discover the tmux socket for this city.
+SOCKET=$(cd "$DEMO_DIR" && gc config get workspace.name 2>/dev/null || echo "theme-demo")
+
+for i in "${!SESSIONS[@]}"; do
+    sess="${SESSIONS[$i]}"
     name="${AGENT_NAMES[$i]}"
     step "Theming '$name' (session: $sess)..."
-    "$PACK_DIR/scripts/tmux-theme.sh" "$sess" "$name" "$PACK_DIR" || true
-    "$PACK_DIR/scripts/tmux-keybindings.sh" "$PACK_DIR" || true
+    GC_TMUX_SOCKET="$SOCKET" "$PACK_DIR/scripts/tmux-theme.sh" "$sess" "$name" "$PACK_DIR" || true
+    GC_TMUX_SOCKET="$SOCKET" "$PACK_DIR/scripts/tmux-keybindings.sh" "$PACK_DIR" || true
 done
 
 step "Theme applied to all agents!"
 echo ""
 echo "  Attach to any session to see the themed status bar:"
 echo ""
-for a in "${AGENTS[@]}"; do
-    echo "    tmux attach -t gc-theme-demo-$a"
+for s in "${SESSIONS[@]}"; do
+    echo "    tmux -L $SOCKET attach -t $s"
 done
 echo ""
 echo "  Keybindings: prefix+n (next), prefix+p (prev), prefix+g (agent menu)"
