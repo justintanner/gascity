@@ -262,7 +262,7 @@ func (f *APIFetcher) FetchWorkers() ([]WorkerRow, error) {
 	return workers, nil
 }
 
-// FetchDogs returns pool agents (city-scoped pool members).
+// FetchDogs returns city-scoped pool agents (rig == "").
 func (f *APIFetcher) FetchDogs() ([]DogRow, error) {
 	var agents []apiAgentResponse
 	if err := f.getList("/v0/agents", &agents); err != nil {
@@ -271,7 +271,7 @@ func (f *APIFetcher) FetchDogs() ([]DogRow, error) {
 
 	var rows []DogRow
 	for _, agent := range agents {
-		if agent.Pool == "" {
+		if agent.Rig != "" || agent.Pool == "" {
 			continue
 		}
 

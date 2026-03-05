@@ -311,7 +311,7 @@ func (f *LiveConvoyFetcher) FetchMayor() (*MayorStatus, error) {
 	return status, nil
 }
 
-// FetchDogs returns pool agents named "dog" using gc agent list --json.
+// FetchDogs returns city-scoped pool agents (rig == "").
 func (f *LiveConvoyFetcher) FetchDogs() ([]DogRow, error) {
 	agents, err := f.fetchAgentList()
 	if err != nil {
@@ -320,7 +320,7 @@ func (f *LiveConvoyFetcher) FetchDogs() ([]DogRow, error) {
 
 	var rows []DogRow
 	for _, agent := range agents {
-		if !strings.HasPrefix(agent.Name, "dog") {
+		if agent.Rig != "" || agent.Pool == "" {
 			continue
 		}
 
