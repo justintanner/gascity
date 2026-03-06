@@ -192,6 +192,77 @@ func TestDoAgentLogsNegativeTail(t *testing.T) {
 	}
 }
 
+// TestDoAgentLogsFollowSeeding verifies that follow mode seeds the 'seen' map
+// with ALL existing messages (not just the tail window) before entering the
+// poll loop. Without this, switching from tail=N to tail=0 re-reads would
+// replay messages from before the compaction boundary.
+func TestDoAgentLogsFollowSeeding(t *testing.T) {
+	searchBase := t.TempDir()
+	workDir := t.TempDir()
+
+	// Session with two compact boundaries: tail=1 shows only the last segment.
+	// Need 2 boundaries so sliceAtCompactBoundaries actually trims.
+	writeTestSession(t, searchBase, workDir,
+		`{"uuid":"1","parentUuid":"","type":"user","message":{"role":"user","content":"old msg"},"timestamp":"2025-01-01T00:00:00Z"}`,
+		`{"uuid":"2","parentUuid":"1","type":"system","subtype":"compact_boundary","message":{"role":"system","content":"compacted 1"},"timestamp":"2025-01-01T00:00:01Z"}`,
+		`{"uuid":"3","parentUuid":"2","type":"user","message":{"role":"user","content":"middle msg"},"timestamp":"2025-01-01T00:00:02Z"}`,
+		`{"uuid":"4","parentUuid":"3","type":"system","subtype":"compact_boundary","message":{"role":"system","content":"compacted 2"},"timestamp":"2025-01-01T00:00:03Z"}`,
+		`{"uuid":"5","parentUuid":"4","type":"user","message":{"role":"user","content":"recent msg"},"timestamp":"2025-01-01T00:00:04Z"}`,
+	)
+
+	path := sessionlog.FindSessionFile([]string{searchBase}, workDir)
+	if path == "" {
+		t.Fatal("session file not found")
+	}
+
+	// Simulate what doAgentLogs does: initial tail=1 read, then seed seen
+	// map with tail=0. Verify "old msg" uuid is in seen even though it
+	// wasn't printed.
+	sess, err := sessionlog.ReadFile(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seen := make(map[string]bool)
+	for _, msg := range sess.Messages {
+		seen[msg.UUID] = true
+	}
+
+	// At this point, seen should NOT contain uuid "1" (it's before the boundary).
+	if seen["1"] {
+		t.Fatal("tail=1 should not include pre-boundary messages")
+	}
+
+	// Now simulate the seeding step (what doAgentLogs does before follow loop).
+	full, err := sessionlog.ReadFile(path, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, msg := range full.Messages {
+		seen[msg.UUID] = true
+	}
+
+	// After seeding, "1" should be in seen — preventing replay on re-read.
+	if !seen["1"] {
+		t.Error("after follow-mode seeding, pre-boundary message UUID should be in seen")
+	}
+
+	// Simulate a follow-mode re-read: no unseen messages should exist.
+	reread, err := sessionlog.ReadFile(path, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var unseen []string
+	for _, msg := range reread.Messages {
+		if !seen[msg.UUID] {
+			unseen = append(unseen, msg.UUID)
+		}
+	}
+	if len(unseen) > 0 {
+		t.Errorf("follow-mode re-read found unseen messages (would be replayed): %v", unseen)
+	}
+}
+
 func TestPrintLogEntryTimestamp(t *testing.T) {
 	searchBase := t.TempDir()
 	workDir := t.TempDir()

@@ -114,6 +114,18 @@ func doAgentLogs(path string, follow bool, tail int, stdout, stderr io.Writer) i
 		return 0
 	}
 
+	// Seed 'seen' with ALL existing messages so the tail=0 re-reads in the
+	// follow loop don't replay messages that were intentionally excluded by
+	// the initial tail window.
+	if tail > 0 {
+		full, err := sessionlog.ReadFile(path, 0)
+		if err == nil {
+			for _, msg := range full.Messages {
+				seen[msg.UUID] = true
+			}
+		}
+	}
+
 	// Follow mode: poll every 2 seconds for new messages.
 	// Use tail=0 (all) for re-reads so compaction boundaries don't cause
 	// missed messages. The seen map prevents re-printing.
