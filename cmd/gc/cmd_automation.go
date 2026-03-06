@@ -397,7 +397,7 @@ func doAutomationRun(aa []automations.Automation, name, rig string, runner Sling
 		pool := qualifyPool(a.Pool, a.Rig)
 		routeCmd += fmt.Sprintf(" --add-label=pool:%s", pool)
 	}
-	if _, err := runner(routeCmd); err != nil {
+	if _, err := runner("", routeCmd); err != nil {
 		fmt.Fprintf(stderr, "gc automation run: labeling wisp: %v\n", err) //nolint:errcheck // best-effort stderr
 		return 1
 	}

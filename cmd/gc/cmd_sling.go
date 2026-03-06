@@ -121,15 +121,21 @@ type slingDeps struct {
 	Stderr   io.Writer
 }
 
-// SlingRunner executes a shell command and returns combined output.
-type SlingRunner func(command string) (string, error)
+// SlingRunner executes a shell command in the given directory and returns
+// combined output. If dir is empty, the command inherits the caller's cwd.
+type SlingRunner func(dir, command string) (string, error)
 
 // shellSlingRunner runs a command via sh -c and returns stdout.
-// Times out after 30 seconds.
-func shellSlingRunner(command string) (string, error) {
+// Times out after 30 seconds. If dir is non-empty, the command runs in
+// that directory (needed for rig-scoped beads whose .beads/ lives there).
+func shellSlingRunner(dir, command string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "sh", "-c", command).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("running %q: %w", command, err)
 	}
@@ -229,6 +235,20 @@ func findRigByPrefix(cfg *config.City, prefix string) (config.Rig, bool) {
 	return config.Rig{}, false
 }
 
+// rigDirForBead resolves the rig directory for a bead ID by extracting
+// the bead prefix and looking up the rig path. Returns "" if the bead
+// has no prefix or no matching rig is found.
+func rigDirForBead(cfg *config.City, beadID string) string {
+	bp := beadPrefix(beadID)
+	if bp == "" {
+		return ""
+	}
+	if rig, ok := findRigByPrefix(cfg, bp); ok {
+		return rig.Path
+	}
+	return ""
+}
+
 // doSling is the pure logic for gc sling. Accepts injected deps, querier,
 // and opts struct for testability.
 func doSling(opts slingOpts, deps slingDeps, querier BeadQuerier) int {
@@ -322,7 +342,8 @@ func doSling(opts slingOpts, deps slingDeps, querier BeadQuerier) int {
 
 	// Build and execute sling command.
 	slingCmd := buildSlingCommand(a.EffectiveSlingQuery(), beadID)
-	if _, err := deps.Runner(slingCmd); err != nil {
+	rigDir := rigDirForBead(deps.Cfg, beadID)
+	if _, err := deps.Runner(rigDir, slingCmd); err != nil {
 		fmt.Fprintf(deps.Stderr, "gc sling: %v\n", err) //nolint:errcheck // best-effort
 		telemetry.RecordSling(context.Background(), a.QualifiedName(), targetType(&a), method, err)
 		return 1
@@ -508,7 +529,8 @@ func doSlingBatch(opts slingOpts, deps slingDeps, querier BeadChildQuerier) int 
 		}
 
 		slingCmd := buildSlingCommand(a.EffectiveSlingQuery(), child.ID)
-		if _, err := deps.Runner(slingCmd); err != nil {
+		rigDir := rigDirForBead(deps.Cfg, child.ID)
+		if _, err := deps.Runner(rigDir, slingCmd); err != nil {
 			fmt.Fprintf(deps.Stderr, "  Failed %s: %v\n", child.ID, err) //nolint:errcheck // best-effort
 			telemetry.RecordSling(context.Background(), a.QualifiedName(), targetType(&a), batchMethod, err)
 			failed++

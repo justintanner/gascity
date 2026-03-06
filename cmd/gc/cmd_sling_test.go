@@ -67,7 +67,7 @@ func (r *fakeRunner) on(prefix, out string, err error) {
 	r.rules = append(r.rules, fakeRunnerRule{prefix: prefix, out: out, err: err})
 }
 
-func (r *fakeRunner) run(command string) (string, error) {
+func (r *fakeRunner) run(_, command string) (string, error) {
 	r.calls = append(r.calls, command)
 	for _, rule := range r.rules {
 		if strings.Contains(command, rule.prefix) {

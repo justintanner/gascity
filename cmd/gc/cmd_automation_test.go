@@ -250,7 +250,7 @@ func TestAutomationRun(t *testing.T) {
 
 	// SlingRunner still handles the route command.
 	calls := []string{}
-	fakeRunner := func(cmd string) (string, error) {
+	fakeRunner := func(_, cmd string) (string, error) {
 		calls = append(calls, cmd)
 		return "", nil
 	}
@@ -286,7 +286,7 @@ func TestAutomationRunNoPool(t *testing.T) {
 	})
 
 	calls := []string{}
-	fakeRunner := func(cmd string) (string, error) {
+	fakeRunner := func(_, cmd string) (string, error) {
 		calls = append(calls, cmd)
 		return "", nil
 	}
@@ -545,7 +545,7 @@ func TestAutomationRunRigQualifiesPool(t *testing.T) {
 	})
 
 	calls := []string{}
-	fakeRunner := func(cmd string) (string, error) {
+	fakeRunner := func(_, cmd string) (string, error) {
 		calls = append(calls, cmd)
 		return "", nil
 	}

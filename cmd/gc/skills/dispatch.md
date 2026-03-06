@@ -10,6 +10,10 @@ gc sling <agent> <bead-id>             # Route a bead to an agent's hook
 
 The agent receives the bead on its hook and runs it per GUPP.
 
+**Rig-scoped beads:** `gc sling` automatically resolves the rig directory
+for rig-scoped bead IDs (e.g. `hw-abc`) and runs `bd update` from there,
+so the rig's `.beads` database is found without manual intervention.
+
 ## Formula dispatch (formula on agent)
 
 ```
