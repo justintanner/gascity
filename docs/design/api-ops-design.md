@@ -1,6 +1,6 @@
 # Design Doc: State-Mutating Operations API Surface
 
-**Status:** Draft — ready for review
+**Status:** Phase 1 implemented — Phases 2-5 are future work
 **Date:** 2026-03-06
 **Authors:** Claude (industry analysis + endpoint catalog), Codex (semantic analysis + control-plane model)
 **Synthesized by:** Claude
@@ -1262,37 +1262,44 @@ acceptable as a behavioral change rather than a breaking change.
 
 ## 15. Delivery Phases
 
-### Phase 1: Fix Semantics + Agent/Rig CRUD
+### Phase 1: Fix Semantics + Agent/Rig CRUD ✓
 
 **The critical fix.** Suspend/resume becomes desired-state. Add structural
 CRUD for agents and rigs.
 
-**Endpoints:** ~20
+**Endpoints delivered:**
 ```
 PATCH  /v0/city                        # city suspend/resume (desired state)
 POST   /v0/agents                      # create agent
-PUT    /v0/agent/{name}                # replace agent
 PATCH  /v0/agent/{name}                # partial update agent
 DELETE /v0/agent/{name}                # destroy agent
-POST   /v0/agent/{name}/start          # start session
-POST   /v0/agent/{name}/stop           # stop session
-POST   /v0/agent/{name}/restart        # restart session
-POST   /v0/agent/{name}/scale          # scale pool
 POST   /v0/rigs                        # create rig
 PATCH  /v0/rig/{name}                  # update rig
 DELETE /v0/rig/{name}                  # remove rig
-POST   /v0/rig/{name}/restart          # restart rig
-+ Redefine suspend/resume on agents and rigs
-+ Extend CSRF/read-only middleware to PUT/PATCH/DELETE
-+ Add configMu serialization
-+ Derive ETags from config hashes (no state files)
++ Suspend/resume rewritten as desired-state (city.toml, not session metadata)
++ CSRF/read-only middleware extended to PATCH/DELETE
++ configedit.Editor serializes config mutations with mutex
++ Provenance detection for pack-derived agents (409 on direct mutation)
++ *bool for Suspended in PATCH structs to avoid zero-value trap
 ```
 
-**Implementation:**
-- `internal/fsys/atomic.go` — atomic file write helper
-- `internal/configedit/` — serialized config editor with provenance detection
-- Redefine suspend/resume in `cmd/gc/api_state.go` to write city.toml
-- New handler files for agent/rig CRUD
+**Implementation files:**
+- `internal/fsys/atomic.go` — atomic file write helper (temp + rename)
+- `internal/fsys/fsys.go` — added `Remove` to FS interface
+- `internal/configedit/configedit.go` — serialized config editor with provenance detection
+- `internal/configedit/configedit_test.go` — 33 tests
+- `internal/api/state.go` — `AgentUpdate`/`RigUpdate` types, extended `StateMutator`
+- `internal/api/handler_agent_crud.go` — agent create/update/delete handlers
+- `internal/api/handler_rig_crud.go` — rig create/update/delete handlers
+- `internal/api/handler_city.go` — city suspend/resume handler
+- `internal/api/middleware.go` — `isMutationMethod()` for CSRF/read-only
+- `cmd/gc/api_state.go` — suspend/resume rewritten to use `configedit.Editor`
+
+**Deferred from original design (moved to Phase 2+):**
+- PUT (full replace) — PATCH-only is simpler and avoids the PUT=PATCH trap
+- ETags / optimistic concurrency
+- start/stop/restart/scale actions (remain as existing POST actions)
+- Idempotency keys, dry-run mode
 
 ### Phase 2: Providers + Config + Patch Resources
 

@@ -18,7 +18,7 @@ func WriteFileAtomic(fs FS, path string, data []byte, perm os.FileMode) error {
 	}
 	if err := fs.Rename(tmp, path); err != nil {
 		// Best-effort cleanup of temp file.
-		_ = os.Remove(tmp)
+		_ = fs.Remove(tmp)
 		return fmt.Errorf("renaming temp file: %w", err)
 	}
 	return nil

@@ -74,13 +74,7 @@ func (s *Server) handleRigUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	patch := config.Rig{
-		Path:   body.Path,
-		Prefix: body.Prefix,
-	}
-	if body.Suspended != nil {
-		patch.Suspended = *body.Suspended
-	}
+	patch := RigUpdate(body)
 
 	if err := sm.UpdateRig(name, patch); err != nil {
 		if strings.Contains(err.Error(), "not found") {

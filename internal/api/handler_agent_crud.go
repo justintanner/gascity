@@ -18,8 +18,8 @@ type agentCreateRequest struct {
 // agentUpdateRequest is the JSON body for PUT/PATCH /v0/agent/{name}.
 type agentUpdateRequest struct {
 	Provider  string `json:"provider,omitempty"`
-	Suspended *bool  `json:"suspended,omitempty"`
 	Scope     string `json:"scope,omitempty"`
+	Suspended *bool  `json:"suspended,omitempty"`
 }
 
 func (s *Server) handleAgentCreate(w http.ResponseWriter, r *http.Request) {
@@ -70,35 +70,21 @@ func (s *Server) handleAgentUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate agent exists.
-	cfg := s.state.Config()
-	agentCfg, ok := findAgent(cfg, name)
-	if !ok {
-		writeError(w, http.StatusNotFound, "not_found", "agent "+name+" not found")
-		return
-	}
-
 	var body agentUpdateRequest
 	if err := decodeBody(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid", err.Error())
 		return
 	}
 
-	// Build updated agent from existing config + request body.
-	updated := agentCfg
-	if body.Provider != "" {
-		updated.Provider = body.Provider
-	}
-	if body.Suspended != nil {
-		updated.Suspended = *body.Suspended
-	}
-	if body.Scope != "" {
-		updated.Scope = body.Scope
-	}
+	patch := AgentUpdate(body)
 
-	if err := sm.UpdateAgent(name, updated); err != nil {
+	if err := sm.UpdateAgent(name, patch); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			writeError(w, http.StatusNotFound, "not_found", err.Error())
+			return
+		}
+		if strings.Contains(err.Error(), "pack-derived") {
+			writeError(w, http.StatusConflict, "conflict", err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", err.Error())

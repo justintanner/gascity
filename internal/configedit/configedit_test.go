@@ -431,7 +431,7 @@ func TestUpdateAgent(t *testing.T) {
 	path := writeTOML(t, dir, minimalCity())
 	ed := configedit.NewEditor(fsys.OSFS{}, path)
 
-	err := ed.UpdateAgent("mayor", config.Agent{Name: "mayor", Provider: "gemini"})
+	err := ed.UpdateAgent("mayor", configedit.AgentUpdate{Provider: "gemini"})
 	if err != nil {
 		t.Fatalf("UpdateAgent: %v", err)
 	}
@@ -442,12 +442,40 @@ func TestUpdateAgent(t *testing.T) {
 	}
 }
 
+func TestUpdateAgent_PreservesSuspended(t *testing.T) {
+	dir := t.TempDir()
+	city := `[workspace]
+name = "test-city"
+
+[[agents]]
+name = "mayor"
+provider = "claude"
+suspended = true
+`
+	path := writeTOML(t, dir, city)
+	ed := configedit.NewEditor(fsys.OSFS{}, path)
+
+	// PATCH provider only — suspended must NOT be reset.
+	err := ed.UpdateAgent("mayor", configedit.AgentUpdate{Provider: "gemini"})
+	if err != nil {
+		t.Fatalf("UpdateAgent: %v", err)
+	}
+
+	cfg := readTOML(t, path)
+	if cfg.Agents[0].Provider != "gemini" {
+		t.Errorf("provider = %q, want %q", cfg.Agents[0].Provider, "gemini")
+	}
+	if !cfg.Agents[0].Suspended {
+		t.Error("suspended was reset to false — zero-value bug")
+	}
+}
+
 func TestUpdateAgent_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTOML(t, dir, minimalCity())
 	ed := configedit.NewEditor(fsys.OSFS{}, path)
 
-	err := ed.UpdateAgent("nonexistent", config.Agent{Name: "nonexistent", Provider: "claude"})
+	err := ed.UpdateAgent("nonexistent", configedit.AgentUpdate{Provider: "claude"})
 	if err == nil {
 		t.Error("expected error for nonexistent agent")
 	}
@@ -518,7 +546,7 @@ func TestUpdateRig(t *testing.T) {
 	path := writeTOML(t, dir, cityWithRig())
 	ed := configedit.NewEditor(fsys.OSFS{}, path)
 
-	err := ed.UpdateRig("my-rig", config.Rig{Path: "/tmp/updated"})
+	err := ed.UpdateRig("my-rig", configedit.RigUpdate{Path: "/tmp/updated"})
 	if err != nil {
 		t.Fatalf("UpdateRig: %v", err)
 	}
@@ -526,6 +554,34 @@ func TestUpdateRig(t *testing.T) {
 	cfg := readTOML(t, path)
 	if cfg.Rigs[0].Path != "/tmp/updated" {
 		t.Errorf("path = %q, want %q", cfg.Rigs[0].Path, "/tmp/updated")
+	}
+}
+
+func TestUpdateRig_PreservesSuspended(t *testing.T) {
+	dir := t.TempDir()
+	city := `[workspace]
+name = "test-city"
+
+[[rigs]]
+name = "my-rig"
+path = "/tmp/my-rig"
+suspended = true
+`
+	path := writeTOML(t, dir, city)
+	ed := configedit.NewEditor(fsys.OSFS{}, path)
+
+	// PATCH path only — suspended must NOT be reset.
+	err := ed.UpdateRig("my-rig", configedit.RigUpdate{Path: "/tmp/updated"})
+	if err != nil {
+		t.Fatalf("UpdateRig: %v", err)
+	}
+
+	cfg := readTOML(t, path)
+	if cfg.Rigs[0].Path != "/tmp/updated" {
+		t.Errorf("path = %q, want %q", cfg.Rigs[0].Path, "/tmp/updated")
+	}
+	if !cfg.Rigs[0].Suspended {
+		t.Error("suspended was reset to false — zero-value bug")
 	}
 }
 

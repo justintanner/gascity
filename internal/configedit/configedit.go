@@ -288,16 +288,36 @@ func (e *Editor) CreateAgent(a config.Agent) error {
 	})
 }
 
-// UpdateAgent replaces an existing inline agent definition.
-// Returns an error if the agent is not found.
-func (e *Editor) UpdateAgent(name string, a config.Agent) error {
-	return e.Edit(func(cfg *config.City) error {
+// AgentUpdate holds optional fields for a partial agent update.
+type AgentUpdate struct {
+	Provider  string
+	Scope     string
+	Suspended *bool
+}
+
+// UpdateAgent partially updates an existing agent. Uses EditExpanded for
+// provenance detection — pack-derived agents return a clear error.
+func (e *Editor) UpdateAgent(name string, patch AgentUpdate) error {
+	return e.EditExpanded(func(raw, expanded *config.City) error {
+		origin := AgentOrigin(raw, expanded, name)
+		switch origin {
+		case OriginDerived:
+			return fmt.Errorf("agent %q is pack-derived; cannot update directly (use patches)", name)
+		case OriginNotFound:
+			return fmt.Errorf("agent %q not found", name)
+		}
 		dir, base := config.ParseQualifiedName(name)
-		for i := range cfg.Agents {
-			if cfg.Agents[i].Dir == dir && cfg.Agents[i].Name == base {
-				// Preserve Dir from the target slot.
-				a.Dir = cfg.Agents[i].Dir
-				cfg.Agents[i] = a
+		for i := range raw.Agents {
+			if raw.Agents[i].Dir == dir && raw.Agents[i].Name == base {
+				if patch.Provider != "" {
+					raw.Agents[i].Provider = patch.Provider
+				}
+				if patch.Scope != "" {
+					raw.Agents[i].Scope = patch.Scope
+				}
+				if patch.Suspended != nil {
+					raw.Agents[i].Suspended = *patch.Suspended
+				}
 				return nil
 			}
 		}
@@ -341,9 +361,18 @@ func (e *Editor) CreateRig(r config.Rig) error {
 	})
 }
 
-// UpdateRig partially updates an existing rig. Only non-zero fields in
-// the provided rig are applied. Returns an error if the rig is not found.
-func (e *Editor) UpdateRig(name string, patch config.Rig) error {
+// RigUpdate holds optional fields for a partial rig update. Pointer fields
+// distinguish "not set" from "set to zero value" to avoid the PATCH
+// zero-value trap (e.g., omitting suspended must not reset it to false).
+type RigUpdate struct {
+	Path      string
+	Prefix    string
+	Suspended *bool
+}
+
+// UpdateRig partially updates an existing rig. Only non-nil/non-empty
+// fields are applied. Returns an error if the rig is not found.
+func (e *Editor) UpdateRig(name string, patch RigUpdate) error {
 	return e.Edit(func(cfg *config.City) error {
 		for i := range cfg.Rigs {
 			if cfg.Rigs[i].Name == name {
@@ -353,8 +382,9 @@ func (e *Editor) UpdateRig(name string, patch config.Rig) error {
 				if patch.Prefix != "" {
 					cfg.Rigs[i].Prefix = patch.Prefix
 				}
-				// Suspended is explicitly set (not a zero-value check).
-				cfg.Rigs[i].Suspended = patch.Suspended
+				if patch.Suspended != nil {
+					cfg.Rigs[i].Suspended = *patch.Suspended
+				}
 				return nil
 			}
 		}

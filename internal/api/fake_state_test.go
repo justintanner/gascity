@@ -160,12 +160,19 @@ func (f *fakeMutatorState) CreateAgent(a config.Agent) error {
 	return nil
 }
 
-func (f *fakeMutatorState) UpdateAgent(name string, a config.Agent) error {
+func (f *fakeMutatorState) UpdateAgent(name string, patch AgentUpdate) error {
 	dir, base := config.ParseQualifiedName(name)
 	for i := range f.cfg.Agents {
 		if f.cfg.Agents[i].Dir == dir && f.cfg.Agents[i].Name == base {
-			a.Dir = f.cfg.Agents[i].Dir
-			f.cfg.Agents[i] = a
+			if patch.Provider != "" {
+				f.cfg.Agents[i].Provider = patch.Provider
+			}
+			if patch.Scope != "" {
+				f.cfg.Agents[i].Scope = patch.Scope
+			}
+			if patch.Suspended != nil {
+				f.cfg.Agents[i].Suspended = *patch.Suspended
+			}
 			return nil
 		}
 	}
@@ -188,13 +195,18 @@ func (f *fakeMutatorState) CreateRig(r config.Rig) error {
 	return nil
 }
 
-func (f *fakeMutatorState) UpdateRig(name string, r config.Rig) error {
+func (f *fakeMutatorState) UpdateRig(name string, patch RigUpdate) error {
 	for i := range f.cfg.Rigs {
 		if f.cfg.Rigs[i].Name == name {
-			if r.Path != "" {
-				f.cfg.Rigs[i].Path = r.Path
+			if patch.Path != "" {
+				f.cfg.Rigs[i].Path = patch.Path
 			}
-			f.cfg.Rigs[i].Suspended = r.Suspended
+			if patch.Prefix != "" {
+				f.cfg.Rigs[i].Prefix = patch.Prefix
+			}
+			if patch.Suspended != nil {
+				f.cfg.Rigs[i].Suspended = *patch.Suspended
+			}
 			return nil
 		}
 	}

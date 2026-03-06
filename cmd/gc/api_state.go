@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gastownhall/gascity/internal/agent"
+	"github.com/gastownhall/gascity/internal/api"
 	"github.com/gastownhall/gascity/internal/beads"
 	beadsexec "github.com/gastownhall/gascity/internal/beads/exec"
 	"github.com/gastownhall/gascity/internal/config"
@@ -307,9 +308,13 @@ func (cs *controllerState) CreateAgent(a config.Agent) error {
 	return cs.editor.CreateAgent(a)
 }
 
-// UpdateAgent replaces an existing agent definition in city.toml.
-func (cs *controllerState) UpdateAgent(name string, a config.Agent) error {
-	return cs.editor.UpdateAgent(name, a)
+// UpdateAgent partially updates an existing agent definition in city.toml.
+func (cs *controllerState) UpdateAgent(name string, patch api.AgentUpdate) error {
+	return cs.editor.UpdateAgent(name, configedit.AgentUpdate{
+		Provider:  patch.Provider,
+		Scope:     patch.Scope,
+		Suspended: patch.Suspended,
+	})
 }
 
 // DeleteAgent removes an agent from city.toml.
@@ -323,8 +328,12 @@ func (cs *controllerState) CreateRig(r config.Rig) error {
 }
 
 // UpdateRig partially updates a rig in city.toml.
-func (cs *controllerState) UpdateRig(name string, r config.Rig) error {
-	return cs.editor.UpdateRig(name, r)
+func (cs *controllerState) UpdateRig(name string, patch api.RigUpdate) error {
+	return cs.editor.UpdateRig(name, configedit.RigUpdate{
+		Path:      patch.Path,
+		Prefix:    patch.Prefix,
+		Suspended: patch.Suspended,
+	})
 }
 
 // DeleteRig removes a rig from city.toml.

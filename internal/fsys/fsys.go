@@ -29,6 +29,9 @@ type FS interface {
 
 	// Rename renames (moves) oldpath to newpath.
 	Rename(oldpath, newpath string) error
+
+	// Remove removes the named file or empty directory.
+	Remove(name string) error
 }
 
 // OSFS implements [FS] by delegating to the os package.
@@ -62,4 +65,9 @@ func (OSFS) ReadDir(name string) ([]os.DirEntry, error) {
 // Rename delegates to [os.Rename].
 func (OSFS) Rename(oldpath, newpath string) error {
 	return os.Rename(oldpath, newpath)
+}
+
+// Remove delegates to [os.Remove].
+func (OSFS) Remove(name string) error {
+	return os.Remove(name)
 }

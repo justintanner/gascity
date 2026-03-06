@@ -58,6 +58,22 @@ type State interface {
 	IsQuarantined(sessionName string) bool
 }
 
+// AgentUpdate holds optional fields for a partial agent update. Pointer fields
+// distinguish "not set" from "set to zero value."
+type AgentUpdate struct {
+	Provider  string
+	Scope     string
+	Suspended *bool
+}
+
+// RigUpdate holds optional fields for a partial rig update. Pointer fields
+// distinguish "not set" from "set to zero value."
+type RigUpdate struct {
+	Path      string
+	Prefix    string
+	Suspended *bool
+}
+
 // StateMutator extends State with write operations for mutation endpoints.
 type StateMutator interface {
 	State
@@ -85,8 +101,8 @@ type StateMutator interface {
 	// CreateAgent adds a new agent to city.toml.
 	CreateAgent(a config.Agent) error
 
-	// UpdateAgent replaces an existing agent definition in city.toml.
-	UpdateAgent(name string, a config.Agent) error
+	// UpdateAgent partially updates an existing agent definition in city.toml.
+	UpdateAgent(name string, patch AgentUpdate) error
 
 	// DeleteAgent removes an agent from city.toml.
 	DeleteAgent(name string) error
@@ -95,7 +111,7 @@ type StateMutator interface {
 	CreateRig(r config.Rig) error
 
 	// UpdateRig partially updates a rig in city.toml.
-	UpdateRig(name string, r config.Rig) error
+	UpdateRig(name string, patch RigUpdate) error
 
 	// DeleteRig removes a rig from city.toml.
 	DeleteRig(name string) error
