@@ -31,6 +31,7 @@ func newAgentStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 
 // cmdAgentStatus is the CLI entry point for showing agent status.
 func cmdAgentStatus(args []string, stdout, stderr io.Writer) int {
+	fmt.Fprintln(stderr, "Warning: \"gc agent status\" is deprecated, use \"gc session list\"") //nolint:errcheck
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "gc agent status: missing agent name") //nolint:errcheck // best-effort stderr
 		return 1

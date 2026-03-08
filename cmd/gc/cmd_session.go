@@ -12,6 +12,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/gastownhall/gascity/internal/clock"
 	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/runtime"
 	"github.com/gastownhall/gascity/internal/session"
@@ -46,6 +48,7 @@ continuity.`,
 		newSessionRenameCmd(stdout, stderr),
 		newSessionPruneCmd(stdout, stderr),
 		newSessionPeekCmd(stdout, stderr),
+		newSessionWakeCmd(stdout, stderr),
 	)
 	return cmd
 }
@@ -189,6 +192,23 @@ func cmdSessionList(stateFilter, templateFilter string, jsonOutput bool, stdout,
 		return 1
 	}
 
+	// Load config for wake reason computation (best-effort).
+	var cfg *config.City
+	if cityPath, err := resolveCity(); err == nil {
+		if c, err := loadCityConfig(cityPath); err == nil {
+			cfg = c
+		}
+	}
+
+	// Build a bead index for wake reason computation.
+	beadIndex := make(map[string]beads.Bead)
+	if cfg != nil {
+		all, _ := store.ListByLabel(session.LabelSession, 0)
+		for _, b := range all {
+			beadIndex[b.ID] = b
+		}
+	}
+
 	if jsonOutput {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
@@ -202,12 +222,13 @@ func cmdSessionList(stateFilter, templateFilter string, jsonOutput bool, stdout,
 	}
 
 	w := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tTEMPLATE\tSTATE\tTITLE\tAGE\tLAST ACTIVE") //nolint:errcheck // best-effort stdout
+	fmt.Fprintln(w, "ID\tTEMPLATE\tSTATE\tREASON\tTITLE\tAGE\tLAST ACTIVE") //nolint:errcheck // best-effort stdout
 	for _, s := range sessions {
 		state := string(s.State)
 		if s.State == "" {
 			state = "closed"
 		}
+		reason := sessionReason(s, beadIndex, cfg, sp)
 		title := s.Title
 		if title == "" {
 			title = "-"
@@ -220,22 +241,65 @@ func cmdSessionList(stateFilter, templateFilter string, jsonOutput bool, stdout,
 		if !s.LastActive.IsZero() {
 			lastActive = formatDuration(time.Since(s.LastActive)) + " ago"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", s.ID, s.Template, state, title, age, lastActive) //nolint:errcheck // best-effort stdout
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.ID, s.Template, state, reason, title, age, lastActive) //nolint:errcheck // best-effort stdout
 	}
 	_ = w.Flush() //nolint:errcheck // best-effort stdout
 	return 0
 }
 
-// newSessionAttachCmd creates the "gc session attach <id>" command.
+// sessionReason computes the REASON column for a session in gc session list.
+// For awake sessions, shows wake reasons (e.g., "config", "attached").
+// For asleep sessions, shows the sleep reason (e.g., "user-hold", "quarantine").
+// For closed sessions, shows "-".
+func sessionReason(s session.Info, beadIndex map[string]beads.Bead, cfg *config.City, sp runtime.Provider) string {
+	if s.State == "" {
+		return "-" // closed
+	}
+
+	b, ok := beadIndex[s.ID]
+	if !ok || cfg == nil {
+		return "-" // no bead data or config available
+	}
+
+	// Compute wake reasons from bead metadata and config.
+	// Pass nil for poolDesired — CLI doesn't run the pool evaluator.
+	// This means pool agents show "config" if their template exists,
+	// regardless of slot. Acceptable for CLI display.
+	reasons := wakeReasons(b, cfg, sp, nil, clock.Real{})
+
+	if len(reasons) > 0 {
+		parts := make([]string, len(reasons))
+		for i, r := range reasons {
+			parts[i] = string(r)
+		}
+		return strings.Join(parts, ",")
+	}
+
+	// No wake reasons — show why it's asleep.
+	if sr := b.Metadata["sleep_reason"]; sr != "" {
+		return sr
+	}
+	if b.Metadata["quarantined_until"] != "" {
+		return "quarantine"
+	}
+	if b.Metadata["held_until"] != "" {
+		return "user-hold"
+	}
+	return "-"
+}
+
+// newSessionAttachCmd creates the "gc session attach <id-or-name>" command.
 func newSessionAttachCmd(stdout, stderr io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "attach <session-id>",
+		Use:   "attach <session-id-or-name>",
 		Short: "Attach to (or resume) a chat session",
 		Long: `Attach to a running session or resume a suspended one.
 
 If the session is active with a live tmux session, reattaches.
 If the session is suspended or the tmux session died, resumes
-using the provider's resume mechanism (if supported) or restarts.`,
+using the provider's resume mechanism (if supported) or restarts.
+
+Accepts a session ID (e.g., gc-42) or template name (e.g., overseer).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if cmdSessionAttach(args, stdout, stderr) != 0 {
@@ -248,8 +312,6 @@ using the provider's resume mechanism (if supported) or restarts.`,
 
 // cmdSessionAttach is the CLI entry point for "gc session attach".
 func cmdSessionAttach(args []string, stdout, stderr io.Writer) int {
-	sessionID := args[0]
-
 	cityPath, err := resolveCity()
 	if err != nil {
 		fmt.Fprintf(stderr, "gc session attach: %v\n", err) //nolint:errcheck // best-effort stderr
@@ -264,6 +326,12 @@ func cmdSessionAttach(args []string, stdout, stderr io.Writer) int {
 	store, code := openCityStore(stderr, "gc session attach")
 	if store == nil {
 		return code
+	}
+
+	sessionID, err := resolveSessionID(store, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "gc session attach: %v\n", err) //nolint:errcheck // best-effort stderr
+		return 1
 	}
 
 	sp := newSessionProvider()
@@ -315,13 +383,15 @@ func buildResumeCommand(cfg *config.City, info session.Info) (string, runtime.Co
 	return cmd, hints
 }
 
-// newSessionSuspendCmd creates the "gc session suspend <id>" command.
+// newSessionSuspendCmd creates the "gc session suspend <id-or-name>" command.
 func newSessionSuspendCmd(stdout, stderr io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "suspend <session-id>",
+		Use:   "suspend <session-id-or-name>",
 		Short: "Suspend a session (save state, free resources)",
 		Long: `Suspend an active session by stopping its runtime process.
-The session bead persists and can be resumed later.`,
+The session bead persists and can be resumed later.
+
+Accepts a session ID (e.g., gc-42) or template name (e.g., overseer).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if cmdSessionSuspend(args, stdout, stderr) != 0 {
@@ -334,11 +404,15 @@ The session bead persists and can be resumed later.`,
 
 // cmdSessionSuspend is the CLI entry point for "gc session suspend".
 func cmdSessionSuspend(args []string, stdout, stderr io.Writer) int {
-	sessionID := args[0]
-
 	store, code := openCityStore(stderr, "gc session suspend")
 	if store == nil {
 		return code
+	}
+
+	sessionID, err := resolveSessionID(store, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "gc session suspend: %v\n", err) //nolint:errcheck // best-effort stderr
+		return 1
 	}
 
 	sp := newSessionProvider()
@@ -353,13 +427,15 @@ func cmdSessionSuspend(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// newSessionCloseCmd creates the "gc session close <id>" command.
+// newSessionCloseCmd creates the "gc session close <id-or-name>" command.
 func newSessionCloseCmd(stdout, stderr io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "close <session-id>",
+		Use:   "close <session-id-or-name>",
 		Short: "Close a session permanently",
-		Long:  `End a conversation. Stops the runtime if active and closes the bead.`,
-		Args:  cobra.ExactArgs(1),
+		Long: `End a conversation. Stops the runtime if active and closes the bead.
+
+Accepts a session ID (e.g., gc-42) or template name (e.g., overseer).`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if cmdSessionClose(args, stdout, stderr) != 0 {
 				return errExit
@@ -371,11 +447,15 @@ func newSessionCloseCmd(stdout, stderr io.Writer) *cobra.Command {
 
 // cmdSessionClose is the CLI entry point for "gc session close".
 func cmdSessionClose(args []string, stdout, stderr io.Writer) int {
-	sessionID := args[0]
-
 	store, code := openCityStore(stderr, "gc session close")
 	if store == nil {
 		return code
+	}
+
+	sessionID, err := resolveSessionID(store, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "gc session close: %v\n", err) //nolint:errcheck // best-effort stderr
+		return 1
 	}
 
 	sp := newSessionProvider()
@@ -390,10 +470,10 @@ func cmdSessionClose(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// newSessionRenameCmd creates the "gc session rename <id> <title>" command.
+// newSessionRenameCmd creates the "gc session rename <id-or-name> <title>" command.
 func newSessionRenameCmd(stdout, stderr io.Writer) *cobra.Command {
 	return &cobra.Command{
-		Use:   "rename <session-id> <title>",
+		Use:   "rename <session-id-or-name> <title>",
 		Short: "Rename a session",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -407,11 +487,17 @@ func newSessionRenameCmd(stdout, stderr io.Writer) *cobra.Command {
 
 // cmdSessionRename is the CLI entry point for "gc session rename".
 func cmdSessionRename(args []string, stdout, stderr io.Writer) int {
-	sessionID, title := args[0], args[1]
+	title := args[1]
 
 	store, code := openCityStore(stderr, "gc session rename")
 	if store == nil {
 		return code
+	}
+
+	sessionID, err := resolveSessionID(store, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "gc session rename: %v\n", err) //nolint:errcheck // best-effort stderr
+		return 1
 	}
 
 	sp := newSessionProvider()
@@ -507,11 +593,11 @@ func parsePruneDuration(s string) (time.Duration, error) {
 	return dur, nil
 }
 
-// newSessionPeekCmd creates the "gc session peek <id>" command.
+// newSessionPeekCmd creates the "gc session peek <id-or-name>" command.
 func newSessionPeekCmd(stdout, stderr io.Writer) *cobra.Command {
 	var lines int
 	cmd := &cobra.Command{
-		Use:   "peek <session-id>",
+		Use:   "peek <session-id-or-name>",
 		Short: "View session output without attaching",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -527,11 +613,15 @@ func newSessionPeekCmd(stdout, stderr io.Writer) *cobra.Command {
 
 // cmdSessionPeek is the CLI entry point for "gc session peek".
 func cmdSessionPeek(args []string, lines int, stdout, stderr io.Writer) int {
-	sessionID := args[0]
-
 	store, code := openCityStore(stderr, "gc session peek")
 	if store == nil {
 		return code
+	}
+
+	sessionID, err := resolveSessionID(store, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "gc session peek: %v\n", err) //nolint:errcheck // best-effort stderr
+		return 1
 	}
 
 	sp := newSessionProvider()

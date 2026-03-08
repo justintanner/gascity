@@ -784,6 +784,7 @@ func doAgentPeek(a agent.Handle, lines int, stdout, stderr io.Writer) int {
 // cmdAgentList is the CLI entry point for listing agents. It locates
 // the city root and delegates to doAgentList.
 func cmdAgentList(dirFilter string, jsonOutput bool, stdout, stderr io.Writer) int {
+	fmt.Fprintln(stderr, "Warning: \"gc agent list\" is deprecated, use \"gc session list\"") //nolint:errcheck
 	cityPath, err := resolveCity()
 	if err != nil {
 		fmt.Fprintf(stderr, "gc agent list: %v\n", err) //nolint:errcheck // best-effort stderr
