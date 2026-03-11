@@ -157,10 +157,10 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = out.Close() }()
 
 	if _, err = io.Copy(out, in); err != nil {
+		_ = out.Close()
 		return err
 	}
-	return nil
+	return out.Close()
 }

@@ -117,19 +117,30 @@ func ReadFrom(path string, offset int64) ([]Event, int64, error) {
 	}
 
 	var result []Event
-	scanner := bufio.NewScanner(f)
+	r := bufio.NewReader(f)
 	bytesRead := int64(0)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		bytesRead += int64(len(line)) + 1 // +1 for newline
-		var e Event
-		if err := json.Unmarshal(line, &e); err != nil {
-			continue // skip malformed lines (partial writes)
+	for {
+		line, err := r.ReadBytes('\n')
+		if len(line) > 0 {
+			bytesRead += int64(len(line))
+			trimmed := line
+			// Strip trailing \n and optional \r for CRLF compatibility.
+			trimmed = trimmed[:len(trimmed)-1]
+			if len(trimmed) > 0 && trimmed[len(trimmed)-1] == '\r' {
+				trimmed = trimmed[:len(trimmed)-1]
+			}
+			var e Event
+			if jsonErr := json.Unmarshal(trimmed, &e); jsonErr == nil {
+				result = append(result, e)
+			}
+			// skip malformed lines (partial writes)
 		}
-		result = append(result, e)
-	}
-	if err := scanner.Err(); err != nil {
-		return result, offset + bytesRead, fmt.Errorf("scanning events: %w", err)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return result, offset + bytesRead, fmt.Errorf("scanning events: %w", err)
+		}
 	}
 	return result, offset + bytesRead, nil
 }

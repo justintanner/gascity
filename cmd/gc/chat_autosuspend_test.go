@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/gastownhall/gascity/internal/clock"
 	"github.com/gastownhall/gascity/internal/runtime"
 	"github.com/gastownhall/gascity/internal/session"
 )
@@ -16,6 +17,8 @@ func TestAutoSuspendChatSessions(t *testing.T) {
 	store := beads.NewMemStore()
 	sp := runtime.NewFake()
 	mgr := session.NewManager(store, sp)
+	now := time.Date(2026, 3, 11, 12, 0, 0, 0, time.UTC)
+	clk := &clock.Fake{Time: now}
 
 	// Create two sessions.
 	s1, err := mgr.Create(context.Background(), "default", "S1", "echo s1", "/tmp", "test", nil, session.ProviderResume{}, runtime.Config{})
@@ -28,15 +31,15 @@ func TestAutoSuspendChatSessions(t *testing.T) {
 	}
 
 	// Set activity times: s1 was active 2 hours ago, s2 was active 1 minute ago.
-	sp.SetActivity(s1.SessionName, time.Now().Add(-2*time.Hour))
-	sp.SetActivity(s2.SessionName, time.Now().Add(-1*time.Minute))
+	sp.SetActivity(s1.SessionName, now.Add(-2*time.Hour))
+	sp.SetActivity(s2.SessionName, now.Add(-1*time.Minute))
 
 	// Neither is attached.
 	sp.SetAttached(s1.SessionName, false)
 	sp.SetAttached(s2.SessionName, false)
 
 	var stdout, stderr bytes.Buffer
-	autoSuspendChatSessions(store, sp, 30*time.Minute, &stdout, &stderr)
+	autoSuspendChatSessions(store, sp, 30*time.Minute, clk, &stdout, &stderr)
 
 	// s1 should be suspended (idle 2h > 30m timeout).
 	got1, err := mgr.Get(s1.ID)
@@ -69,6 +72,8 @@ func TestAutoSuspendSkipsAttachedSessions(t *testing.T) {
 	store := beads.NewMemStore()
 	sp := runtime.NewFake()
 	mgr := session.NewManager(store, sp)
+	now := time.Date(2026, 3, 11, 12, 0, 0, 0, time.UTC)
+	clk := &clock.Fake{Time: now}
 
 	s1, err := mgr.Create(context.Background(), "default", "Attached", "echo a", "/tmp", "test", nil, session.ProviderResume{}, runtime.Config{})
 	if err != nil {
@@ -76,11 +81,11 @@ func TestAutoSuspendSkipsAttachedSessions(t *testing.T) {
 	}
 
 	// Old activity but attached — should NOT be suspended.
-	sp.SetActivity(s1.SessionName, time.Now().Add(-2*time.Hour))
+	sp.SetActivity(s1.SessionName, now.Add(-2*time.Hour))
 	sp.SetAttached(s1.SessionName, true)
 
 	var stdout, stderr bytes.Buffer
-	autoSuspendChatSessions(store, sp, 30*time.Minute, &stdout, &stderr)
+	autoSuspendChatSessions(store, sp, 30*time.Minute, clk, &stdout, &stderr)
 
 	got, err := mgr.Get(s1.ID)
 	if err != nil {
@@ -92,11 +97,11 @@ func TestAutoSuspendSkipsAttachedSessions(t *testing.T) {
 }
 
 func TestAutoSuspendNilStore(t *testing.T) {
-	t.Helper() // uses t for test name
 	sp := runtime.NewFake()
+	clk := &clock.Fake{Time: time.Date(2026, 3, 11, 12, 0, 0, 0, time.UTC)}
 	var stdout, stderr bytes.Buffer
 	// Should not panic with nil store.
-	autoSuspendChatSessions(nil, sp, 30*time.Minute, &stdout, &stderr)
+	autoSuspendChatSessions(nil, sp, 30*time.Minute, clk, &stdout, &stderr)
 	if stdout.Len() != 0 || stderr.Len() != 0 {
 		t.Errorf("unexpected output with nil store: stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}

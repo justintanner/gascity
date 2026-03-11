@@ -355,7 +355,7 @@ func (cr *CityRuntime) tick(
 
 	// Chat session auto-suspend: suspend detached idle sessions.
 	if idleTimeout := cr.cfg.ChatSessions.IdleTimeoutDuration(); idleTimeout > 0 {
-		autoSuspendChatSessions(cr.cityBeadStore(), cr.sp, idleTimeout, cr.stdout, cr.stderr)
+		autoSuspendChatSessions(cr.cityBeadStore(), cr.sp, idleTimeout, clock.Real{}, cr.stdout, cr.stderr)
 	}
 
 	// Drain queued convergence requests (CLI commands) BEFORE tick so

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"time"
 
 	"github.com/gastownhall/gascity/internal/runtime"
@@ -21,6 +22,7 @@ type idleTracker interface {
 
 // memoryIdleTracker is the production implementation of idleTracker.
 type memoryIdleTracker struct {
+	mu       sync.Mutex
 	timeouts map[string]time.Duration // session → idle timeout
 }
 
@@ -33,6 +35,8 @@ func newIdleTracker() *memoryIdleTracker {
 }
 
 func (m *memoryIdleTracker) setTimeout(sessionName string, timeout time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if timeout <= 0 {
 		delete(m.timeouts, sessionName)
 		return
@@ -41,7 +45,9 @@ func (m *memoryIdleTracker) setTimeout(sessionName string, timeout time.Duration
 }
 
 func (m *memoryIdleTracker) checkIdle(sessionName string, sp runtime.Provider, now time.Time) bool {
+	m.mu.Lock()
 	timeout, ok := m.timeouts[sessionName]
+	m.mu.Unlock()
 	if !ok || timeout <= 0 {
 		return false
 	}
