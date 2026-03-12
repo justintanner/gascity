@@ -1,0 +1,31 @@
+# Notify gascity-hosted to rebuild the gc-runtime image.
+#
+# gascity provides the gc CLI binary compiled into the runtime image.
+#
+# Required secret: GASCITY_HOSTED_TOKEN — PAT with repo scope for
+# gastownhall/gascity-hosted (needed for repository_dispatch).
+
+name: Notify Runtime Rebuild
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cmd/gc/**"
+      - "internal/**"
+      - "pkg/**"
+      - "go.mod"
+      - "go.sum"
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GASCITY_HOSTED_TOKEN }}
+          repository: gastownhall/gascity-hosted
+          event-type: runtime-dep-updated
+          client-payload: '{"repo": ${{ toJSON(github.repository) }}, "sha": ${{ toJSON(github.sha) }}}'
