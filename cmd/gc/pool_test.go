@@ -386,6 +386,7 @@ func TestDeepCopyAgentCoversAllFields(t *testing.T) {
 		Attach:                 &trueVal,
 		Fallback:               true,
 		PoolName:               "template/name",
+		ResumeCommand:          "claude --resume {{.SessionKey}} --dangerously",
 		DependsOn:              []string{"other-agent"},
 		WakeMode:               "fresh",
 	}

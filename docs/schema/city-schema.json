@@ -219,6 +219,10 @@
           "type": "array",
           "description": "DependsOn lists agent names that must be awake before this agent wakes.\nUsed for dependency-ordered startup and shutdown. Validated for cycles\nat config load time."
         },
+        "resume_command": {
+          "type": "string",
+          "description": "ResumeCommand is the full shell command to run when resuming this agent.\nSupports {{.SessionKey}} template variable. When set, takes precedence\nover the provider's ResumeFlag/ResumeStyle. Example:\n  \"claude --resume {{.SessionKey}} --dangerously-skip-permissions\""
+        },
         "wake_mode": {
           "type": "string",
           "enum": [
@@ -418,6 +422,10 @@
           "type": "array",
           "description": "DependsOn overrides the agent's dependency list."
         },
+        "resume_command": {
+          "type": "string",
+          "description": "ResumeCommand overrides the agent's resume_command template."
+        },
         "wake_mode": {
           "type": "string",
           "enum": [
@@ -562,6 +570,10 @@
           },
           "type": "array",
           "description": "DependsOn overrides the agent's dependency list."
+        },
+        "resume_command": {
+          "type": "string",
+          "description": "ResumeCommand overrides the agent's resume_command template."
         },
         "wake_mode": {
           "type": "string",
@@ -1298,6 +1310,10 @@
         "resume_style": {
           "type": "string",
           "description": "ResumeStyle controls how ResumeFlag is applied:\n  \"flag\"       → command --resume \u003ckey\u003e              (default)\n  \"subcommand\" → command resume \u003ckey\u003e"
+        },
+        "resume_command": {
+          "type": "string",
+          "description": "ResumeCommand is the full shell command to run when resuming a session.\nSupports {{.SessionKey}} template variable. When set, takes precedence\nover ResumeFlag/ResumeStyle. Example:\n  \"claude --resume {{.SessionKey}} --dangerously-skip-permissions\""
         },
         "session_id_flag": {
           "type": "string",

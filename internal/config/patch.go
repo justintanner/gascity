@@ -70,6 +70,8 @@ type AgentPatch struct {
 	Attach *bool `toml:"attach,omitempty"`
 	// DependsOn overrides the agent's dependency list.
 	DependsOn []string `toml:"depends_on,omitempty"`
+	// ResumeCommand overrides the agent's resume_command template.
+	ResumeCommand *string `toml:"resume_command,omitempty"`
 	// WakeMode overrides the agent's wake mode ("resume" or "fresh").
 	WakeMode *string `toml:"wake_mode,omitempty" jsonschema:"enum=resume,enum=fresh"`
 	// PreStartAppend appends commands to the agent's pre_start list
@@ -249,6 +251,9 @@ func applyAgentPatchFields(a *Agent, p *AgentPatch) {
 	// fix would use *[]string or a presence flag across all list fields.
 	if len(p.DependsOn) > 0 {
 		a.DependsOn = append([]string(nil), p.DependsOn...)
+	}
+	if p.ResumeCommand != nil {
+		a.ResumeCommand = *p.ResumeCommand
 	}
 	if p.WakeMode != nil {
 		a.WakeMode = *p.WakeMode

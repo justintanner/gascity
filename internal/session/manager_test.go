@@ -588,6 +588,27 @@ func TestBuildResumeCommand(t *testing.T) {
 			},
 			want: "codex resume abc-123 --model o3",
 		},
+		{
+			name: "explicit resume_command takes precedence",
+			info: Info{
+				Command:       "claude --dangerously-skip-permissions",
+				Provider:      "claude",
+				SessionKey:    "abc-123",
+				ResumeFlag:    "--resume",
+				ResumeCommand: "claude --resume {{.SessionKey}} --dangerously-skip-permissions",
+			},
+			want: "claude --resume abc-123 --dangerously-skip-permissions",
+		},
+		{
+			name: "resume_command without session key falls back",
+			info: Info{
+				Command:       "claude --dangerously-skip-permissions",
+				Provider:      "claude",
+				ResumeFlag:    "--resume",
+				ResumeCommand: "claude --resume {{.SessionKey}} --dangerously-skip-permissions",
+			},
+			want: "claude --dangerously-skip-permissions",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

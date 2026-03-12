@@ -308,7 +308,7 @@ func reconcileSessionBeads(
 			}
 			agentCfg := templateParamsToConfig(tp)
 			if sk := session.Metadata["session_key"]; sk != "" && tp.ResolvedProvider != nil {
-				agentCfg.Command = applyResumeToCommand(agentCfg.Command, sk, tp.ResolvedProvider)
+				agentCfg.Command = resolveResumeCommand(agentCfg.Command, sk, tp.ResolvedProvider)
 			}
 			err := sp.Start(startCtx, name, agentCfg)
 			if startCancel != nil {
@@ -367,10 +367,15 @@ func reconcileSessionBeads(
 	return wakeCount
 }
 
-// applyResumeToCommand modifies the command to resume an existing session
-// using the provider's resume semantics. The provider config determines the
-// flag and style; the session key comes from bead metadata.
-func applyResumeToCommand(command, sessionKey string, rp *config.ResolvedProvider) string {
+// resolveResumeCommand returns the command to use when resuming a session.
+// Priority: explicit resume_command (with {{.SessionKey}} expansion) >
+// ResumeFlag/ResumeStyle auto-construction > original command unchanged.
+func resolveResumeCommand(command, sessionKey string, rp *config.ResolvedProvider) string {
+	// Explicit resume_command takes precedence.
+	if rp.ResumeCommand != "" {
+		return strings.ReplaceAll(rp.ResumeCommand, "{{.SessionKey}}", sessionKey)
+	}
+	// Fall back to ResumeFlag/ResumeStyle auto-construction.
 	if rp.ResumeFlag == "" {
 		return command
 	}

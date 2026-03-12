@@ -215,6 +215,8 @@ type AgentOverride struct {
 	Attach *bool `toml:"attach,omitempty"`
 	// DependsOn overrides the agent's dependency list.
 	DependsOn []string `toml:"depends_on,omitempty"`
+	// ResumeCommand overrides the agent's resume_command template.
+	ResumeCommand *string `toml:"resume_command,omitempty"`
 	// WakeMode overrides the agent's wake mode ("resume" or "fresh").
 	WakeMode *string `toml:"wake_mode,omitempty" jsonschema:"enum=resume,enum=fresh"`
 	// InjectFragmentsAppend appends to the agent's inject_fragments list.
@@ -1093,6 +1095,11 @@ type Agent struct {
 	// Used for dependency-ordered startup and shutdown. Validated for cycles
 	// at config load time.
 	DependsOn []string `toml:"depends_on,omitempty"`
+	// ResumeCommand is the full shell command to run when resuming this agent.
+	// Supports {{.SessionKey}} template variable. When set, takes precedence
+	// over the provider's ResumeFlag/ResumeStyle. Example:
+	//   "claude --resume {{.SessionKey}} --dangerously-skip-permissions"
+	ResumeCommand string `toml:"resume_command,omitempty"`
 	// WakeMode controls context freshness across sleep/wake cycles.
 	// "resume" (default): reuse provider session key for conversation continuity.
 	// "fresh": start a new provider session on every wake (polecat pattern).

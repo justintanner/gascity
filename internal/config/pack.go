@@ -857,6 +857,9 @@ func applyAgentOverride(a *Agent, ov *AgentOverride) {
 	if len(ov.DependsOn) > 0 {
 		a.DependsOn = append([]string(nil), ov.DependsOn...)
 	}
+	if ov.ResumeCommand != nil {
+		a.ResumeCommand = *ov.ResumeCommand
+	}
 	if ov.WakeMode != nil {
 		a.WakeMode = *ov.WakeMode
 	}

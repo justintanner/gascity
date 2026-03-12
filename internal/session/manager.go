@@ -48,21 +48,22 @@ const LabelSession = "gc:session"
 
 // Info holds the user-facing details of a chat session.
 type Info struct {
-	ID          string
-	Template    string
-	State       State
-	Closed      bool
-	Title       string
-	Provider    string
-	Command     string // resolved command stored at creation
-	WorkDir     string
-	SessionName string // tmux session name
-	SessionKey  string // provider-specific resume handle (UUID)
-	ResumeFlag  string // stored provider resume flag (e.g., "--resume")
-	ResumeStyle string // "flag" or "subcommand"
-	CreatedAt   time.Time
-	LastActive  time.Time
-	Attached    bool
+	ID            string
+	Template      string
+	State         State
+	Closed        bool
+	Title         string
+	Provider      string
+	Command       string // resolved command stored at creation
+	WorkDir       string
+	SessionName   string // tmux session name
+	SessionKey    string // provider-specific resume handle (UUID)
+	ResumeFlag    string // stored provider resume flag (e.g., "--resume")
+	ResumeStyle   string // "flag" or "subcommand"
+	ResumeCommand string // explicit resume command template ({{.SessionKey}})
+	CreatedAt     time.Time
+	LastActive    time.Time
+	Attached      bool
 }
 
 // ProviderResume describes a provider's session resume capabilities.
@@ -73,6 +74,9 @@ type ProviderResume struct {
 	ResumeFlag string
 	// ResumeStyle is "flag" (--resume <key>) or "subcommand" (command resume <key>).
 	ResumeStyle string
+	// ResumeCommand is the full shell command template for resuming.
+	// Supports {{.SessionKey}}. When set, takes precedence over ResumeFlag/ResumeStyle.
+	ResumeCommand string
 	// SessionIDFlag is the CLI flag for creating with a specific ID (e.g., "--session-id").
 	// Enables Generate & Pass strategy.
 	SessionIDFlag string
@@ -181,13 +185,14 @@ func (m *Manager) CreateWithTransport(ctx context.Context, template, title, comm
 
 	// Create the bead first to get the ID.
 	meta := map[string]string{
-		"template":     template,
-		"state":        string(StateActive),
-		"provider":     provider,
-		"work_dir":     workDir,
-		"command":      command,
-		"resume_flag":  resume.ResumeFlag,
-		"resume_style": resume.ResumeStyle,
+		"template":       template,
+		"state":          string(StateActive),
+		"provider":       provider,
+		"work_dir":       workDir,
+		"command":        command,
+		"resume_flag":    resume.ResumeFlag,
+		"resume_style":   resume.ResumeStyle,
+		"resume_command": resume.ResumeCommand,
 	}
 	if normalizedTransport := normalizeTransport(provider, transport); normalizedTransport != "" {
 		meta["transport"] = normalizedTransport
@@ -259,13 +264,14 @@ func (m *Manager) CreateBeadOnly(template, title, command, workDir, provider, tr
 	}
 
 	meta := map[string]string{
-		"template":     template,
-		"state":        "creating",
-		"provider":     provider,
-		"work_dir":     workDir,
-		"command":      command,
-		"resume_flag":  resume.ResumeFlag,
-		"resume_style": resume.ResumeStyle,
+		"template":       template,
+		"state":          "creating",
+		"provider":       provider,
+		"work_dir":       workDir,
+		"command":        command,
+		"resume_flag":    resume.ResumeFlag,
+		"resume_style":   resume.ResumeStyle,
+		"resume_command": resume.ResumeCommand,
 	}
 	if normalizedTransport := normalizeTransport(provider, transport); normalizedTransport != "" {
 		meta["transport"] = normalizedTransport
@@ -573,19 +579,20 @@ func (m *Manager) infoFromBead(b beads.Bead) Info {
 	}
 
 	info := Info{
-		ID:          b.ID,
-		Template:    b.Metadata["template"],
-		State:       state,
-		Closed:      closed,
-		Title:       b.Title,
-		Provider:    b.Metadata["provider"],
-		Command:     b.Metadata["command"],
-		WorkDir:     b.Metadata["work_dir"],
-		SessionName: sessName,
-		SessionKey:  b.Metadata["session_key"],
-		ResumeFlag:  b.Metadata["resume_flag"],
-		ResumeStyle: b.Metadata["resume_style"],
-		CreatedAt:   b.CreatedAt,
+		ID:            b.ID,
+		Template:      b.Metadata["template"],
+		State:         state,
+		Closed:        closed,
+		Title:         b.Title,
+		Provider:      b.Metadata["provider"],
+		Command:       b.Metadata["command"],
+		WorkDir:       b.Metadata["work_dir"],
+		SessionName:   sessName,
+		SessionKey:    b.Metadata["session_key"],
+		ResumeFlag:    b.Metadata["resume_flag"],
+		ResumeStyle:   b.Metadata["resume_style"],
+		ResumeCommand: b.Metadata["resume_command"],
+		CreatedAt:     b.CreatedAt,
 	}
 
 	// Enrich with live runtime state if active.
@@ -606,10 +613,14 @@ func sessionNameFor(beadID string) string {
 }
 
 // BuildResumeCommand constructs the resume command from stored session info.
-// If the provider supports resume (has ResumeFlag), it builds the appropriate
-// resume command using the session key. Otherwise returns the stored command
-// for a fresh start.
+// Priority: explicit ResumeCommand (with {{.SessionKey}} expansion) >
+// ResumeFlag/ResumeStyle auto-construction > stored command as-is.
 func BuildResumeCommand(info Info) string {
+	// Explicit resume_command takes precedence.
+	if info.ResumeCommand != "" && info.SessionKey != "" {
+		return strings.ReplaceAll(info.ResumeCommand, "{{.SessionKey}}", info.SessionKey)
+	}
+
 	if info.ResumeFlag == "" || info.SessionKey == "" {
 		// Provider doesn't support resume or no key — use stored command.
 		cmd := info.Command

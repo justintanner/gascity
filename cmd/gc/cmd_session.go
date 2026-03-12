@@ -144,6 +144,7 @@ func cmdSessionNew(args []string, title string, noAttach bool, stdout, stderr io
 		info, err := mgr.CreateBeadOnly(canonicalTemplate, title, resolved.CommandString(), workDir, resolved.Name, found.Session, resolved.Env, session.ProviderResume{
 			ResumeFlag:    resolved.ResumeFlag,
 			ResumeStyle:   resolved.ResumeStyle,
+			ResumeCommand: resolved.ResumeCommand,
 			SessionIDFlag: resolved.SessionIDFlag,
 		})
 		if err != nil {
@@ -187,6 +188,7 @@ func cmdSessionNew(args []string, title string, noAttach bool, stdout, stderr io
 	resume := session.ProviderResume{
 		ResumeFlag:    resolved.ResumeFlag,
 		ResumeStyle:   resolved.ResumeStyle,
+		ResumeCommand: resolved.ResumeCommand,
 		SessionIDFlag: resolved.SessionIDFlag,
 	}
 

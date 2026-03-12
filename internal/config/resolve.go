@@ -141,6 +141,7 @@ func specToResolved(name string, spec *ProviderSpec) *ResolvedProvider {
 		InstructionsFile:       spec.InstructionsFile,
 		ResumeFlag:             spec.ResumeFlag,
 		ResumeStyle:            spec.ResumeStyle,
+		ResumeCommand:          spec.ResumeCommand,
 		SessionIDFlag:          spec.SessionIDFlag,
 	}
 	// Deep-copy OptionsSchema to avoid aliasing the spec's slice.
@@ -240,6 +241,9 @@ func mergeAgentOverrides(rp *ResolvedProvider, agent *Agent) {
 	}
 	if agent.EmitsPermissionWarning != nil {
 		rp.EmitsPermissionWarning = *agent.EmitsPermissionWarning
+	}
+	if agent.ResumeCommand != "" {
+		rp.ResumeCommand = agent.ResumeCommand
 	}
 	// Env merges additively.
 	if len(agent.Env) > 0 {

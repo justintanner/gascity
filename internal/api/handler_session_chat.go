@@ -282,6 +282,7 @@ func (s *Server) handleSessionCreate(w http.ResponseWriter, r *http.Request) {
 	resume := session.ProviderResume{
 		ResumeFlag:    resolved.ResumeFlag,
 		ResumeStyle:   resolved.ResumeStyle,
+		ResumeCommand: resolved.ResumeCommand,
 		SessionIDFlag: resolved.SessionIDFlag,
 	}
 
@@ -395,6 +396,7 @@ func (s *Server) createProviderSession(w http.ResponseWriter, r *http.Request, s
 	resume := session.ProviderResume{
 		ResumeFlag:    resolved.ResumeFlag,
 		ResumeStyle:   resolved.ResumeStyle,
+		ResumeCommand: resolved.ResumeCommand,
 		SessionIDFlag: resolved.SessionIDFlag,
 	}
 

@@ -596,3 +596,41 @@ func TestResolveProviderCustomPermissionModes(t *testing.T) {
 		t.Errorf("safe mode = %q, want %q", rp.PermissionModes["safe"], "--safe-mode")
 	}
 }
+
+// --- ResumeCommand ---
+
+func TestResolveProviderResumeCommandFromSpec(t *testing.T) {
+	agent := &Agent{Name: "worker", Provider: "custom"}
+	providers := map[string]ProviderSpec{
+		"custom": {
+			Command:       "my-agent",
+			ResumeCommand: "my-agent --resume {{.SessionKey}}",
+		},
+	}
+	rp, err := ResolveProvider(agent, nil, providers, lookPathOnly("my-agent"))
+	if err != nil {
+		t.Fatalf("ResolveProvider: %v", err)
+	}
+	if rp.ResumeCommand != "my-agent --resume {{.SessionKey}}" {
+		t.Errorf("ResumeCommand = %q, want %q", rp.ResumeCommand, "my-agent --resume {{.SessionKey}}")
+	}
+}
+
+func TestResolveProviderResumeCommandAgentOverride(t *testing.T) {
+	agent := &Agent{
+		Name:          "worker",
+		Provider:      "claude",
+		ResumeCommand: "claude --resume {{.SessionKey}} --custom-flag",
+	}
+	rp, err := ResolveProvider(agent, nil, nil, lookPathOnly("claude"))
+	if err != nil {
+		t.Fatalf("ResolveProvider: %v", err)
+	}
+	if rp.ResumeCommand != "claude --resume {{.SessionKey}} --custom-flag" {
+		t.Errorf("ResumeCommand = %q, want agent override", rp.ResumeCommand)
+	}
+	// ResumeFlag should still be set from builtin (not cleared by ResumeCommand).
+	if rp.ResumeFlag != "--resume" {
+		t.Errorf("ResumeFlag = %q, want %q (builtin preserved)", rp.ResumeFlag, "--resume")
+	}
+}
