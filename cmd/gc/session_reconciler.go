@@ -317,7 +317,8 @@ func reconcileSessionBeads(
 				agentCfg.WorkDir = wd
 			}
 			if sk := session.Metadata["session_key"]; sk != "" && tp.ResolvedProvider != nil {
-				agentCfg.Command = resolveResumeCommand(agentCfg.Command, sk, tp.ResolvedProvider)
+				firstStart := session.Metadata["started_config_hash"] == ""
+				agentCfg.Command = resolveSessionCommand(agentCfg.Command, sk, tp.ResolvedProvider, firstStart)
 			}
 			err := sp.Start(startCtx, name, agentCfg)
 			if startCancel != nil {
@@ -395,6 +396,17 @@ func resolveTaskWorkDir(store beads.Store, agentName string) string {
 		}
 	}
 	return ""
+}
+
+// resolveSessionCommand returns the command to use when starting a session.
+// On first start (no prior session exists), it uses SessionIDFlag to create a
+// session with the given key as its ID. On subsequent wakes, it uses
+// resolveResumeCommand to resume the existing session.
+func resolveSessionCommand(command, sessionKey string, rp *config.ResolvedProvider, firstStart bool) string {
+	if firstStart && rp.SessionIDFlag != "" {
+		return command + " " + rp.SessionIDFlag + " " + sessionKey
+	}
+	return resolveResumeCommand(command, sessionKey, rp)
 }
 
 // resolveResumeCommand returns the command to use when resuming a session.

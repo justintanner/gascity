@@ -846,3 +846,35 @@ func TestResolveResumeCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveSessionCommand(t *testing.T) {
+	claude := &config.ResolvedProvider{
+		ResumeFlag:    "--resume",
+		SessionIDFlag: "--session-id",
+	}
+
+	t.Run("first start uses --session-id", func(t *testing.T) {
+		got := resolveSessionCommand("claude --dangerously-skip-permissions", "abc-123", claude, true)
+		want := "claude --dangerously-skip-permissions --session-id abc-123"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("resume uses --resume", func(t *testing.T) {
+		got := resolveSessionCommand("claude --dangerously-skip-permissions", "abc-123", claude, false)
+		want := "claude --dangerously-skip-permissions --resume abc-123"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("first start without SessionIDFlag falls back to resume", func(t *testing.T) {
+		noSessionID := &config.ResolvedProvider{ResumeFlag: "--resume"}
+		got := resolveSessionCommand("agent run", "key-1", noSessionID, true)
+		want := "agent run --resume key-1"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+}
