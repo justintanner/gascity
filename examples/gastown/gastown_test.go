@@ -130,9 +130,9 @@ func TestWorktreeSetupKeepsIgnoresLocal(t *testing.T) {
 	runCmd(t, repo, "git", "add", ".")
 	runCmd(t, repo, "git", "commit", "-m", "init")
 
-	runCmd(t, tmp, "sh", script, repo, "polecat-a", city)
-
 	worktree := filepath.Join(city, ".gc", "worktrees", filepath.Base(repo), "polecat-a")
+	runCmd(t, tmp, "sh", script, repo, worktree, "polecat-a")
+
 	gitignorePath := filepath.Join(worktree, ".gitignore")
 	data, err := os.ReadFile(gitignorePath)
 	if err != nil {
@@ -158,6 +158,7 @@ func TestWorktreeSetupKeepsIgnoresLocal(t *testing.T) {
 		".beads/formulas/",
 		".runtime/",
 		".logs/",
+		"worktrees/",
 		"__pycache__/",
 		".claude/",
 		".codex/",
@@ -199,7 +200,7 @@ func TestWorktreeSetupKeepsIgnoresLocal(t *testing.T) {
 	}
 
 	before := exclude
-	runCmd(t, tmp, "sh", script, repo, "polecat-a", city)
+	runCmd(t, tmp, "sh", script, repo, worktree, "polecat-a")
 	afterData, err := os.ReadFile(excludePath)
 	if err != nil {
 		t.Fatalf("reading local exclude after rerun: %v", err)
@@ -471,6 +472,36 @@ func TestCombinedPackParses(t *testing.T) {
 	for _, a := range tc.Agents {
 		if wantCity[a.Name] && a.Scope != "city" {
 			t.Errorf("agent %q: scope = %q, want %q", a.Name, a.Scope, "city")
+		}
+	}
+}
+
+func TestPackUsesIsolatedWorkDirs(t *testing.T) {
+	dir := exampleDir()
+	topoPath := filepath.Join(dir, "packs", "gastown", "pack.toml")
+
+	data, err := os.ReadFile(topoPath)
+	if err != nil {
+		t.Fatalf("reading pack.toml: %v", err)
+	}
+
+	var tc packFileConfig
+	if _, err := toml.Decode(string(data), &tc); err != nil {
+		t.Fatalf("parsing pack.toml: %v", err)
+	}
+
+	want := map[string]string{
+		"mayor":    ".gc/agents/mayor",
+		"deacon":   ".gc/agents/deacon",
+		"boot":     ".gc/agents/boot",
+		"witness":  ".gc/agents/{{.Rig}}/witness",
+		"refinery": ".gc/worktrees/{{.Rig}}/refinery",
+		"polecat":  ".gc/worktrees/{{.Rig}}/polecats/{{.AgentBase}}",
+		"dog":      ".gc/agents/dogs/{{.AgentBase}}",
+	}
+	for _, a := range tc.Agents {
+		if expected, ok := want[a.Name]; ok && a.WorkDir != expected {
+			t.Errorf("agent %q: work_dir = %q, want %q", a.Name, a.WorkDir, expected)
 		}
 	}
 }

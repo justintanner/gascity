@@ -239,6 +239,9 @@ func explainAgent(w io.Writer, a *config.Agent, prov *config.Provenance) {
 	if a.Dir != "" {
 		explainField(w, "dir", a.Dir, source)
 	}
+	if a.WorkDir != "" {
+		explainField(w, "work_dir", a.WorkDir, source)
+	}
 	if a.Suspended {
 		explainField(w, "suspended", "true", source)
 	}

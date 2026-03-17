@@ -117,6 +117,7 @@ func TestApplyAgentPatchCoversAllFields(t *testing.T) {
 	patch := AgentPatch{
 		Dir:                     "target-dir",
 		Name:                    "target-name",
+		WorkDir:                 strVal(".gc/agents/worker"),
 		Scope:                   strVal("city"),
 		Suspended:               &trueVal,
 		Attach:                  &trueVal,
@@ -242,6 +243,7 @@ func TestApplyAgentOverrideCoversAllFields(t *testing.T) {
 	override := AgentOverride{
 		Agent:                   "target",
 		Dir:                     strVal("new-dir"),
+		WorkDir:                 strVal(".gc/agents/target"),
 		Scope:                   strVal("city"),
 		Suspended:               &trueVal,
 		Attach:                  &trueVal,

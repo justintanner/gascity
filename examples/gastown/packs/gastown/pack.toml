@@ -34,6 +34,7 @@ dir = "formulas"
 [[agent]]
 name = "mayor"
 scope = "city"
+work_dir = ".gc/agents/mayor"
 prompt_template = "prompts/mayor.md.tmpl"
 nudge = "Check mail and hook status, then act accordingly."
 overlay_dir = "overlays/default"
@@ -47,6 +48,7 @@ session_live = [
 [[agent]]
 name = "deacon"
 scope = "city"
+work_dir = ".gc/agents/deacon"
 prompt_template = "prompts/deacon.md.tmpl"
 nudge = "Run 'gc prime' to check patrol status and begin heartbeat cycle."
 overlay_dir = "overlays/default"
@@ -60,6 +62,7 @@ session_live = [
 [[agent]]
 name = "boot"
 scope = "city"
+work_dir = ".gc/agents/boot"
 prompt_template = "prompts/boot.md.tmpl"
 overlay_dir = "overlays/default"
 
@@ -67,6 +70,7 @@ overlay_dir = "overlays/default"
 [[agent]]
 name = "witness"
 scope = "rig"
+work_dir = ".gc/agents/{{.Rig}}/witness"
 prompt_template = "prompts/witness.md.tmpl"
 nudge = "Run 'gc prime' to check worker status and begin patrol cycle."
 overlay_dir = "overlays/witness"
@@ -80,10 +84,11 @@ session_live = [
 [[agent]]
 name = "refinery"
 scope = "rig"
+work_dir = ".gc/worktrees/{{.Rig}}/refinery"
 prompt_template = "prompts/refinery.md.tmpl"
 nudge = "Run 'gc prime' to check merge queue and begin processing."
 overlay_dir = "overlays/default"
-pre_start = ["{{.ConfigDir}}/scripts/worktree-setup.sh {{.WorkDir}} {{.Agent}} {{.CityRoot}} --sync"]
+pre_start = ["{{.ConfigDir}}/scripts/worktree-setup.sh {{.RigRoot}} {{.WorkDir}} {{.AgentBase}} --sync"]
 idle_timeout = "2h"
 session_live = [
     "{{.ConfigDir}}/scripts/tmux-theme.sh {{.Session}} {{.Agent}} {{.ConfigDir}}",
@@ -94,10 +99,11 @@ session_live = [
 [[agent]]
 name = "polecat"
 scope = "rig"
+work_dir = ".gc/worktrees/{{.Rig}}/polecats/{{.AgentBase}}"
 prompt_template = "prompts/polecat.md.tmpl"
 nudge = "Check your hook for work assignments."
 overlay_dir = "overlays/default"
-pre_start = ["{{.ConfigDir}}/scripts/worktree-setup.sh {{.WorkDir}} {{.Agent}} {{.CityRoot}} --sync"]
+pre_start = ["{{.ConfigDir}}/scripts/worktree-setup.sh {{.RigRoot}} {{.WorkDir}} {{.AgentBase}} --sync"]
 idle_timeout = "2h"
 session_live = [
     "{{.ConfigDir}}/scripts/tmux-theme.sh {{.Session}} {{.Agent}} {{.ConfigDir}}",
@@ -114,6 +120,7 @@ namepool = "namepools/mad-max.txt"
 [[agent]]
 name = "dog"
 scope = "city"
+work_dir = ".gc/agents/dogs/{{.AgentBase}}"
 prompt_template = "../maintenance/prompts/dog.md.tmpl"
 nudge = "Check your hook for work assignments."
 overlay_dir = "../maintenance/overlays/default"

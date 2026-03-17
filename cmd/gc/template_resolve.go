@@ -51,6 +51,8 @@ type TemplateParams struct {
 	InstanceName string
 	// RigName is the resolved rig association (empty if none).
 	RigName string
+	// RigRoot is the absolute path to the associated rig root (empty if none).
+	RigRoot string
 	// WakeMode controls whether the next wake resumes or starts fresh conversation state.
 	WakeMode string
 	// IsACP is true if session = "acp".
@@ -80,6 +82,7 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 	if err != nil {
 		return TemplateParams{}, fmt.Errorf("agent %q: %w", qualifiedName, err)
 	}
+	_, agentBase := config.ParseQualifiedName(qualifiedName)
 
 	// Step 2: Validate session vs provider compatibility.
 	if cfgAgent.Session == "acp" && !resolved.SupportsACP {
@@ -87,11 +90,15 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 	}
 
 	// Step 3: Expand dir template.
-	expandedDir := expandDirTemplate(cfgAgent.Dir, SessionSetupContext{
-		Agent:    qualifiedName,
-		Rig:      cfgAgent.Dir,
-		CityRoot: p.cityPath,
-		CityName: p.cityName,
+	rigName := configuredRigName(p.cityPath, cfgAgent, p.rigs)
+	rigRoot := rigRootForName(rigName, p.rigs)
+	expandedDir := expandDirTemplate(effectiveWorkDirSpec(cfgAgent), SessionSetupContext{
+		Agent:     qualifiedName,
+		AgentBase: agentBase,
+		Rig:       rigName,
+		RigRoot:   rigRoot,
+		CityRoot:  p.cityPath,
+		CityName:  p.cityName,
 	})
 	workDir, err := resolveAgentDir(p.cityPath, expandedDir)
 	if err != nil {
@@ -115,10 +122,7 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 	}
 	copyFiles = stageHookFiles(copyFiles, p.cityPath, workDir)
 
-	// Step 6: Resolve rig association.
-	rigName := resolveRigForAgent(workDir, p.rigs)
-
-	// Step 7: Compute session name.
+	// Step 6: Compute session name.
 	// Uses bead-derived naming ("s-{beadID}") when a bead store is available,
 	// falling back to the legacy SessionNameFor for backward compatibility.
 	tmplName := templateNameFor(cfgAgent, qualifiedName)
@@ -137,6 +141,7 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 	}
 	if rigName != "" {
 		agentEnv["GC_RIG"] = rigName
+		agentEnv["GC_RIG_ROOT"] = rigRoot
 	}
 
 	// Step 9: Render prompt with beacon.
@@ -148,6 +153,7 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 			AgentName:     qualifiedName,
 			TemplateName:  cfgAgent.Name,
 			RigName:       rigName,
+			RigRoot:       rigRoot,
 			WorkDir:       workDir,
 			IssuePrefix:   findRigPrefix(rigName, p.rigs),
 			DefaultBranch: defaultBranchFor(workDir),
@@ -175,7 +181,9 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 	setupCtx := SessionSetupContext{
 		Session:   sessName,
 		Agent:     qualifiedName,
+		AgentBase: agentBase,
 		Rig:       rigName,
+		RigRoot:   rigRoot,
 		CityRoot:  p.cityPath,
 		CityName:  p.cityName,
 		WorkDir:   workDir,
@@ -218,6 +226,7 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 		TemplateName:     templateNameFor(cfgAgent, qualifiedName),
 		InstanceName:     qualifiedName,
 		RigName:          rigName,
+		RigRoot:          rigRoot,
 		WakeMode:         cfgAgent.WakeMode,
 		IsACP:            cfgAgent.Session == "acp",
 	}, nil

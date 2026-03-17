@@ -62,11 +62,8 @@ func computeSuspendedNames(cfg *config.City, cityName, cityPath string) map[stri
 			if a.Suspended || a.Dir == "" {
 				continue // Already counted or no rig scope.
 			}
-			workDir, err := resolveAgentDir(cityPath, a.Dir)
-			if err != nil {
-				continue
-			}
-			if suspendedRigPaths[filepath.Clean(workDir)] {
+			rigName := configuredRigName(cityPath, &a, cfg.Rigs)
+			if rigName != "" && suspendedRigPaths[filepath.Clean(rigRootForName(rigName, cfg.Rigs))] {
 				names[cliSessionName(cityPath, cityName, a.QualifiedName(), st)] = true
 			}
 		}
@@ -668,6 +665,46 @@ func resolveAgentDir(cityPath, dir string) (string, error) {
 		return "", fmt.Errorf("creating agent dir %q: %w", dir, err)
 	}
 	return dir, nil
+}
+
+// effectiveWorkDirSpec returns the configured working directory for an agent.
+// WorkDir overrides Dir without affecting the agent's qualified identity.
+func effectiveWorkDirSpec(a *config.Agent) string {
+	if a == nil {
+		return ""
+	}
+	if a.WorkDir != "" {
+		return a.WorkDir
+	}
+	return a.Dir
+}
+
+// configuredRigName returns the rig associated with an agent, preferring the
+// legacy dir-as-rig convention and falling back to path matching for inline
+// configs that point directly at a rig path.
+func configuredRigName(cityPath string, a *config.Agent, rigs []config.Rig) string {
+	if a == nil || a.Dir == "" {
+		return ""
+	}
+	for _, r := range rigs {
+		if a.Dir == r.Name {
+			return r.Name
+		}
+	}
+	if abs, err := resolveAgentDir(cityPath, a.Dir); err == nil {
+		return resolveRigForAgent(abs, rigs)
+	}
+	return ""
+}
+
+// rigRootForName returns the configured rig root path.
+func rigRootForName(rigName string, rigs []config.Rig) string {
+	for _, r := range rigs {
+		if r.Name == rigName {
+			return r.Path
+		}
+	}
+	return ""
 }
 
 // passthroughEnv returns environment variables from the parent process that

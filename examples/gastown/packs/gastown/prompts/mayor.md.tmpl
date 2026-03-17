@@ -41,7 +41,8 @@ Don't be dogmatic. Fix things yourself when:
 - Dispatching would take longer than fixing
 - You're building understanding you need for coordination
 
-Work directly in `<rig>/mayor/rig/` — that's your clone. Push to main when done.
+For git work in a rig, use the rig's canonical repo at `{{ .CityRoot }}/<rig>`
+with `git -C`. Your own coordination home is `{{ .WorkDir }}`.
 
 ---
 
@@ -56,18 +57,17 @@ coordinating work across the entire workspace.
 
 ### Directory Guidelines
 
-**For ANY rig's git operations, use `{{ .CityRoot }}/<rig>/mayor/rig/`.**
-This is YOUR clone of each rig's repo — for reading, editing, git log, everything.
+Use these locations consistently:
 
 | Location | Use for |
 |----------|---------|
-| `{{ .CityRoot }}` (city root) | `{{ cmd }} mail`, coordination commands, `bd` with `hq-` prefix |
-| `{{ .CityRoot }}/<rig>/mayor/rig/` | **ALL git/code operations** for that rig |
-| `{{ .CityRoot }}/<rig>/crew/*` | Other agents' workspaces — don't use these |
-| `{{ .CityRoot }}/<rig>/polecats/*` | Polecat sandboxes — don't use these |
+| `{{ .WorkDir }}` | Your own coordination home, runtime files, scratch notes |
+| `{{ .CityRoot }}` | `{{ cmd }} mail`, coordination commands, `bd` with `hq-` prefix |
+| `{{ .CityRoot }}/<rig>` | **ALL git/code operations** for that rig via `git -C` |
+| `{{ .CityRoot }}/.gc/worktrees/<rig>/...` | Agent sandboxes/worktrees — don't use these directly |
 
-**Never use `crew/*` or `polecats/*` directories.** Those belong to other agents
-and may have uncommitted changes or dirty state. `<rig>/mayor/rig/` is yours.
+Never work in another agent's worktree. Use the canonical rig repo root with
+`git -C {{ .CityRoot }}/<rig> ...` for reads, edits, and history inspection.
 
 ## Two-Level Beads Architecture
 

@@ -22,6 +22,7 @@ type PromptContext struct {
 	AgentName     string // qualified: "rig/polecat-1" or "mayor"
 	TemplateName  string // config name: "polecat" (pool template) or "mayor" (singleton)
 	RigName       string
+	RigRoot       string
 	WorkDir       string
 	IssuePrefix   string
 	Branch        string
@@ -149,6 +150,7 @@ func buildTemplateData(ctx PromptContext) map[string]string {
 	m["AgentName"] = ctx.AgentName
 	m["TemplateName"] = ctx.TemplateName
 	m["RigName"] = ctx.RigName
+	m["RigRoot"] = ctx.RigRoot
 	m["WorkDir"] = ctx.WorkDir
 	m["IssuePrefix"] = ctx.IssuePrefix
 	m["Branch"] = ctx.Branch

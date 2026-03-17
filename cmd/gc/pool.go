@@ -77,7 +77,9 @@ func evaluatePool(agentName string, pool config.PoolConfig, dir string, runner S
 type SessionSetupContext struct {
 	Session   string // tmux session name
 	Agent     string // qualified agent name
+	AgentBase string // unqualified agent name or pool instance name
 	Rig       string // rig name (empty for city-scoped)
+	RigRoot   string // absolute path to the rig root (empty for city-scoped)
 	CityRoot  string // city directory path
 	CityName  string // workspace name
 	WorkDir   string // agent working directory
@@ -141,6 +143,7 @@ func deepCopyAgent(src *config.Agent, name, dir string) config.Agent {
 		Name:                name,
 		Description:         src.Description,
 		Dir:                 dir,
+		WorkDir:             src.WorkDir,
 		Scope:               src.Scope,
 		Session:             src.Session,
 		Provider:            src.Provider,

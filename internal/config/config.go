@@ -162,6 +162,9 @@ type AgentOverride struct {
 	Agent string `toml:"agent" jsonschema:"required"`
 	// Dir overrides the stamped dir (default: rig name).
 	Dir *string `toml:"dir,omitempty"`
+	// WorkDir overrides the agent's working directory without changing
+	// its qualified identity or rig association.
+	WorkDir *string `toml:"work_dir,omitempty"`
 	// Scope overrides the agent's scope ("city" or "rig").
 	Scope *string `toml:"scope,omitempty"`
 	// Suspended sets the agent's suspended state.
@@ -1000,8 +1003,13 @@ type Agent struct {
 	Name string `toml:"name" jsonschema:"required"`
 	// Description is a human-readable description shown in MC's session creation UI.
 	Description string `toml:"description,omitempty"`
-	// Dir is the working directory for the agent session.
+	// Dir is the identity prefix for rig-scoped agents and the default
+	// working directory when WorkDir is not set.
 	Dir string `toml:"dir,omitempty"`
+	// WorkDir overrides the session working directory without changing the
+	// agent's qualified identity. Relative paths resolve against city root
+	// and may use the same template placeholders as session_setup.
+	WorkDir string `toml:"work_dir,omitempty"`
 	// Scope defines where this agent is instantiated: "city" (one per city)
 	// or "rig" (one per rig, the default). Only meaningful for pack-defined
 	// agents; inline agents in city.toml use Dir directly.
@@ -1077,7 +1085,8 @@ type Agent struct {
 	HooksInstalled *bool `toml:"hooks_installed,omitempty"`
 	// SessionSetup is a list of shell commands run after session creation.
 	// Each command is a template string supporting placeholders:
-	// {{.Session}}, {{.Agent}}, {{.Rig}}, {{.CityRoot}}, {{.CityName}}, {{.WorkDir}}.
+	// {{.Session}}, {{.Agent}}, {{.AgentBase}}, {{.Rig}}, {{.RigRoot}},
+	// {{.CityRoot}}, {{.CityName}}, {{.WorkDir}}.
 	// Commands run in gc's process (not inside the agent session) via sh -c.
 	SessionSetup []string `toml:"session_setup,omitempty"`
 	// SessionSetupScript is the path to a script run after session_setup commands.

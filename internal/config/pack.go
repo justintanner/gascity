@@ -746,6 +746,9 @@ func applyAgentOverride(a *Agent, ov *AgentOverride) {
 	if ov.Dir != nil {
 		a.Dir = *ov.Dir
 	}
+	if ov.WorkDir != nil {
+		a.WorkDir = *ov.WorkDir
+	}
 	if ov.Scope != nil {
 		a.Scope = *ov.Scope
 	}

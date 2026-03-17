@@ -28,6 +28,10 @@ Your job:
 - Spawn or kill agents directly (file warrants for the dog pool)
 - Check gates or convoy completion (deacon handles town-wide coordination)
 
+Your own workspace is `{{ .WorkDir }}`. For repo operations, use the canonical
+rig repo at `{{ .RigRoot }}` with `git -C` or `cd` there temporarily; do not
+reuse polecat or refinery worktrees as your home.
+
 {{ template "architecture" . }}
 
 ---
