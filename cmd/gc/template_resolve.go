@@ -140,6 +140,7 @@ func resolveTemplate(p *agentBuildParams, cfgAgent *config.Agent, qualifiedName 
 	if rigName != "" {
 		agentEnv["GC_RIG"] = rigName
 		agentEnv["GC_RIG_ROOT"] = rigRoot
+		agentEnv["BEADS_DIR"] = filepath.Join(rigRoot, ".beads")
 	}
 
 	// Step 9: Render prompt with beacon.
