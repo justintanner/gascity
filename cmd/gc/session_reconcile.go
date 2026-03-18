@@ -54,7 +54,7 @@ func wakeReasons(
 	}
 
 	// Config presence — per-instance for pools.
-	template := session.Metadata["template"]
+	template := normalizedSessionTemplate(session, cfg)
 	if !waitHold {
 		if agent := findAgentByTemplate(cfg, template); agent != nil {
 			if agent.Pool == nil {
@@ -309,7 +309,7 @@ func sessionIsQuarantined(session beads.Bead, clk clock.Clock) bool {
 // isPoolExcess returns true if this session is a pool instance whose slot
 // exceeds the current desired count.
 func isPoolExcess(session beads.Bead, cfg *config.City, poolDesired map[string]int) bool {
-	template := session.Metadata["template"]
+	template := normalizedSessionTemplate(session, cfg)
 	agent := findAgentByTemplate(cfg, template)
 	if agent == nil || agent.Pool == nil {
 		return false

@@ -276,7 +276,10 @@ func reconcileSessionBeads(
 		// Config drift: if alive and config changed, drain for restart.
 		// Live-only drift: re-apply session_live without restart.
 		if alive {
-			template := session.Metadata["template"]
+			template := tp.TemplateName
+			if template == "" {
+				template = normalizedSessionTemplate(*session, cfg)
+			}
 			storedHash := session.Metadata["config_hash"]
 			if sh := session.Metadata["started_config_hash"]; sh != "" {
 				storedHash = sh

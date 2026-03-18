@@ -852,6 +852,47 @@ func TestFindSessionNameByTemplate_UsesLegacyAgentLabelForPoolInstance(t *testin
 	}
 }
 
+func TestLookupPoolSessionNames_RejectsSharedPrefixSiblingTemplates(t *testing.T) {
+	store := beads.NewMemStore()
+	for _, bead := range []beads.Bead{
+		{
+			Title:  "worker",
+			Type:   sessionBeadType,
+			Labels: []string{sessionBeadLabel, "agent:frontend/worker-1"},
+			Metadata: map[string]string{
+				"template":     "worker",
+				"pool_slot":    "1",
+				"session_name": "s-worker-1",
+			},
+		},
+		{
+			Title:  "worker-supervisor",
+			Type:   sessionBeadType,
+			Labels: []string{sessionBeadLabel, "agent:frontend/worker-supervisor-1"},
+			Metadata: map[string]string{
+				"template":     "worker-supervisor",
+				"pool_slot":    "1",
+				"session_name": "s-worker-supervisor-1",
+			},
+		},
+	} {
+		if _, err := store.Create(bead); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := lookupPoolSessionNames(store, "frontend/worker")
+	if err != nil {
+		t.Fatalf("lookupPoolSessionNames: %v", err)
+	}
+	if got["frontend/worker-1"] != "s-worker-1" {
+		t.Fatalf("lookupPoolSessionNames(frontend/worker) missing worker-1: %#v", got)
+	}
+	if _, ok := got["frontend/worker-supervisor-1"]; ok {
+		t.Fatalf("lookupPoolSessionNames(frontend/worker) wrongly matched sibling template: %#v", got)
+	}
+}
+
 func TestDiscoverSessionBeads_RigQualifiedTemplate(t *testing.T) {
 	store := beads.NewMemStore()
 

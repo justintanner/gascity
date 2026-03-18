@@ -30,8 +30,11 @@ func (c startCandidate) name() string {
 	return c.session.Metadata["session_name"]
 }
 
-func (c startCandidate) template() string {
-	return c.session.Metadata["template"]
+func (c startCandidate) logicalTemplate(cfg *config.City) string {
+	if c.tp.TemplateName != "" {
+		return c.tp.TemplateName
+	}
+	return normalizedSessionTemplate(*c.session, cfg)
 }
 
 type preparedStart struct {
@@ -245,6 +248,7 @@ func candidateWaveOrder(
 
 func prepareStartCandidate(
 	candidate startCandidate,
+	cfg *config.City,
 	store beads.Store,
 	clk clock.Clock,
 ) (*preparedStart, error) {
@@ -256,7 +260,7 @@ func prepareStartCandidate(
 	agentCfg := templateParamsToConfig(tp)
 	coreHash := runtime.CoreFingerprint(agentCfg)
 	liveHash := runtime.LiveFingerprint(agentCfg)
-	if wd := resolveTaskWorkDir(store, session.Metadata["template"]); wd != "" {
+	if wd := resolveTaskWorkDir(store, candidate.logicalTemplate(cfg)); wd != "" {
 		agentCfg.WorkDir = wd
 	} else if wd := session.Metadata["work_dir"]; wd != "" {
 		agentCfg.WorkDir = wd
@@ -441,14 +445,14 @@ func executePlannedStarts(
 		}
 		if wakeCount >= defaultMaxWakesPerTick {
 			for _, candidate := range waveCandidates {
-				logLifecycleOutcome(stderr, "start", wave, candidate.name(), candidate.template(), "deferred_by_wake_budget", time.Time{}, time.Time{}, nil)
+				logLifecycleOutcome(stderr, "start", wave, candidate.name(), candidate.logicalTemplate(cfg), "deferred_by_wake_budget", time.Time{}, time.Time{}, nil)
 			}
 			continue
 		}
 		var ready []startCandidate
 		for _, candidate := range waveCandidates {
 			if !allDependenciesAlive(*candidate.session, cfg, desiredState, sp, cityName, store) {
-				logLifecycleOutcome(stderr, "start", wave, candidate.name(), candidate.template(), "blocked_on_dependencies", time.Time{}, time.Time{}, nil)
+				logLifecycleOutcome(stderr, "start", wave, candidate.name(), candidate.logicalTemplate(cfg), "blocked_on_dependencies", time.Time{}, time.Time{}, nil)
 				continue
 			}
 			ready = append(ready, candidate)
@@ -456,7 +460,7 @@ func executePlannedStarts(
 		for offset := 0; offset < len(ready); {
 			if wakeCount >= defaultMaxWakesPerTick {
 				for _, candidate := range ready[offset:] {
-					logLifecycleOutcome(stderr, "start", wave, candidate.name(), candidate.template(), "deferred_by_wake_budget", time.Time{}, time.Time{}, nil)
+					logLifecycleOutcome(stderr, "start", wave, candidate.name(), candidate.logicalTemplate(cfg), "deferred_by_wake_budget", time.Time{}, time.Time{}, nil)
 				}
 				break
 			}
@@ -468,7 +472,7 @@ func executePlannedStarts(
 					logLifecycleOutcome(stderr, "start", wave, candidate.name(), normalizedSessionTemplate(*candidate.session, cfg), "blocked_on_dependencies", time.Time{}, time.Time{}, nil)
 					continue
 				}
-				item, err := prepareStartCandidate(candidate, store, clk)
+				item, err := prepareStartCandidate(candidate, cfg, store, clk)
 				if err != nil {
 					fmt.Fprintf(stderr, "session reconciler: pre-wake %s: %v\n", candidate.name(), err) //nolint:errcheck
 					logLifecycleOutcome(stderr, "start", wave, candidate.name(), normalizedSessionTemplate(*candidate.session, cfg), "failed", time.Time{}, time.Time{}, err)

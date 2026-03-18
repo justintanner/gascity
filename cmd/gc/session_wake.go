@@ -278,7 +278,7 @@ func verifiedInterrupt(session beads.Bead, sp runtime.Provider) error {
 // needsConfigRestart returns true if the session's core config has drifted
 // and needs a drain-then-restart cycle.
 func needsConfigRestart(session beads.Bead, cfg *config.City, buildConfigFn func(*config.Agent) runtime.Config) bool {
-	template := session.Metadata["template"]
+	template := normalizedSessionTemplate(session, cfg)
 	agent := findAgentByTemplate(cfg, template)
 	if agent == nil {
 		return false

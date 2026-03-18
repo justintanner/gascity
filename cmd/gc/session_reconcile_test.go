@@ -389,6 +389,32 @@ func TestWakeReasons_WorkSetPoolSlotGated(t *testing.T) {
 	}
 }
 
+func TestWakeReasons_UsesLegacyAgentLabelTemplate(t *testing.T) {
+	now := time.Date(2026, 3, 8, 12, 0, 0, 0, time.UTC)
+	clk := &clock.Fake{Time: now}
+
+	cfg := &config.City{
+		Agents: []config.Agent{
+			{Name: "worker", Dir: "frontend", Pool: &config.PoolConfig{Min: 1, Max: 3}},
+		},
+	}
+
+	session := makeBead("b1", map[string]string{
+		"template":     "worker",
+		"session_name": "custom-worker-1",
+		"pool_slot":    "1",
+	})
+	session.Labels = []string{sessionBeadLabel, "agent:frontend/worker-1"}
+
+	poolDesired := map[string]int{"frontend/worker": 1}
+	workSet := map[string]bool{"frontend/worker": true}
+
+	reasons := wakeReasons(session, cfg, nil, poolDesired, workSet, nil, clk)
+	if len(reasons) != 2 || reasons[0] != WakeConfig || reasons[1] != WakeWork {
+		t.Fatalf("wakeReasons(legacy labeled pool worker) = %v, want [WakeConfig WakeWork]", reasons)
+	}
+}
+
 func TestComputeWorkSet_RunsWorkQuery(t *testing.T) {
 	cfg := &config.City{
 		Agents: []config.Agent{

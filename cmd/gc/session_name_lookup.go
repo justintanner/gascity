@@ -169,7 +169,7 @@ func lookupPoolSessionNames(store beads.Store, template string) (map[string]stri
 			continue
 		}
 		agentName := sessionBeadAgentName(b)
-		if b.Metadata["template"] != template && !strings.HasPrefix(agentName, template+"-") {
+		if b.Metadata["template"] != template && resolvePoolSlot(agentName, template) == 0 {
 			continue
 		}
 		sessionName := b.Metadata["session_name"]

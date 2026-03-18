@@ -289,7 +289,7 @@ func TestFinalizeInitWithoutProgressSkipsStepCounter(t *testing.T) {
 		func(_, _ io.Writer) int { return 0 },
 		func(_, _ io.Writer) int { return 0 },
 		func() int { return 4242 },
-		func(string) (bool, bool) { return true, true },
+		func(string) (bool, string, bool) { return true, "", true },
 		20*time.Millisecond,
 		time.Millisecond,
 	)
