@@ -425,7 +425,7 @@ var initRunVersion = func(binary string) (string, error) {
 
 // Minimum versions for beads-provider binaries.
 const (
-	doltMinVersion = "1.35.0" // sql-server features used by gc-beads-bd
+	doltMinVersion = "1.80.0" // sql-server features used by gc-beads-bd
 	bdMinVersion   = "0.61.0" // BdStore shell-out interface
 )
 
