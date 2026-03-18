@@ -581,6 +581,9 @@ func stopTargetsForNames(names []string, cfg *config.City, store beads.Store) []
 				}
 				if name != "" {
 					subject := bead.Metadata["agent_name"]
+					if subject == "" && template != "" && bead.Metadata["pool_slot"] != "" {
+						subject = template + "-" + bead.Metadata["pool_slot"]
+					}
 					if subject == "" {
 						subject = template
 					}

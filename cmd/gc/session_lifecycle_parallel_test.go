@@ -692,6 +692,38 @@ func TestGracefulStopAll_UsesLogicalSubjectForGracefulExit(t *testing.T) {
 	}
 }
 
+func TestGracefulStopAll_ReconstructsPoolSubjectFromLegacyBead(t *testing.T) {
+	sp := &interruptExitProvider{Fake: runtime.NewFake()}
+	store := beads.NewMemStore()
+	if _, err := store.Create(beads.Bead{
+		Title:  "frontend/worker-2",
+		Type:   sessionBeadType,
+		Labels: []string{sessionBeadLabel},
+		Metadata: map[string]string{
+			"template":     "frontend/worker",
+			"pool_slot":    "2",
+			"session_name": "custom-worker-2",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := sp.Start(context.Background(), "custom-worker-2", runtime.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	rec := events.NewFake()
+	cfg := &config.City{Agents: []config.Agent{{Name: "worker", Dir: "frontend", Pool: &config.PoolConfig{Min: 1, Max: 3}}}}
+	var stdout, stderr bytes.Buffer
+
+	gracefulStopAll([]string{"custom-worker-2"}, sp, 50*time.Millisecond, rec, cfg, store, &stdout, &stderr)
+
+	if len(rec.Events) != 1 {
+		t.Fatalf("got %d events, want 1", len(rec.Events))
+	}
+	if rec.Events[0].Subject != "frontend/worker-2" {
+		t.Fatalf("event subject = %q, want %q", rec.Events[0].Subject, "frontend/worker-2")
+	}
+}
+
 func TestStopWaveOrder_HandlesUnknownTemplateWithoutSerialFallback(t *testing.T) {
 	cfg := &config.City{
 		Agents: []config.Agent{
