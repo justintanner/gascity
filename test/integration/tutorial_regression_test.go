@@ -111,49 +111,54 @@ func TestTutorialRegression(t *testing.T) {
 	assertContains(t, out, "Slung", "gc sling output missing confirmation")
 
 	// ── Phase 6: wait for bead to close ─────────────────────────────
-	deadline := time.Now().Add(5 * time.Minute)
-	var lastStatus string
-	for time.Now().Before(deadline) {
-		out, err = bdReal(rigDir, "show", beadID)
-		if err != nil {
-			t.Logf("bd show error (retrying): %v", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
+	waitForBeadClose(t, rigDir, beadID, 5*time.Minute)
 
-		lower := strings.ToLower(out)
-		if strings.Contains(lower, "closed") {
-			t.Logf("bead %s closed", beadID)
-			goto closed
-		}
-
-		status := parseStatus(lower)
-		if status != lastStatus {
-			t.Logf("bead %s: %s", beadID, status)
-			lastStatus = status
-		}
-		time.Sleep(10 * time.Second)
-	}
-	t.Fatalf("bead %s did not close within 5 minutes:\n%s", beadID, out)
-
-closed:
 	// ── Phase 7: verify agent output ────────────────────────────────
-	entries, err := os.ReadDir(rigDir)
-	if err != nil {
-		t.Fatalf("reading rig dir: %v", err)
-	}
-	var produced []string
-	for _, e := range entries {
-		switch e.Name() {
-		case ".beads", ".gitignore", ".git":
-			continue
-		}
-		produced = append(produced, e.Name())
-	}
+	produced := listUserFiles(t, rigDir)
 	if len(produced) == 0 {
 		t.Errorf("agent closed bead but produced no files in rig dir")
 	} else {
 		t.Logf("agent produced: %v", produced)
+	}
+
+	// ── Phase 8: inline text sling ──────────────────────────────────
+	// Tutorial: `gc sling claude "Write hello-world.cpp"`
+	// Auto-creates a bead from the text and slings it in one command.
+	out, err = gcReal(rigDir, "sling", "claude", "Write hello-world.cpp")
+	if err != nil {
+		t.Fatalf("gc sling inline text failed: %v\n%s", err, out)
+	}
+	t.Logf("gc sling inline:\n%s", out)
+	assertContains(t, out, "Slung", "inline sling output missing confirmation")
+
+	// Extract the auto-created bead ID.
+	inlineBeadID := extractSlingBeadID(t, out)
+	t.Logf("inline bead ID: %s", inlineBeadID)
+
+	if !strings.HasPrefix(inlineBeadID, "hw-") {
+		t.Errorf("inline bead ID %q has wrong prefix — expected hw-", inlineBeadID)
+	}
+
+	// Wait for the inline bead to close.
+	waitForBeadClose(t, rigDir, inlineBeadID, 5*time.Minute)
+
+	// Verify hello-world.cpp was created.
+	cppPath := filepath.Join(rigDir, "hello-world.cpp")
+	if _, serr := os.Stat(cppPath); os.IsNotExist(serr) {
+		allFiles := listUserFiles(t, rigDir)
+		var cppFiles []string
+		for _, f := range allFiles {
+			if strings.HasSuffix(f, ".cpp") {
+				cppFiles = append(cppFiles, f)
+			}
+		}
+		if len(cppFiles) == 0 {
+			t.Errorf("agent did not produce any .cpp file; files: %v", allFiles)
+		} else {
+			t.Logf("agent produced .cpp files: %v (expected hello-world.cpp)", cppFiles)
+		}
+	} else {
+		t.Logf("hello-world.cpp created successfully")
 	}
 }
 
@@ -191,6 +196,77 @@ func bdReal(dir string, args ...string) (string, error) {
 	cmd.Env = acceptanceEnv()
 	out, err := cmd.CombinedOutput()
 	return string(out), err
+}
+
+// waitForBeadClose polls bd show until the bead is closed or timeout.
+func waitForBeadClose(t *testing.T, dir, beadID string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	var lastStatus, out string
+	var err error
+	for time.Now().Before(deadline) {
+		out, err = bdReal(dir, "show", beadID)
+		if err != nil {
+			t.Logf("bd show error (retrying): %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		lower := strings.ToLower(out)
+		if strings.Contains(lower, "closed") {
+			t.Logf("bead %s closed", beadID)
+			return
+		}
+		status := parseStatus(lower)
+		if status != lastStatus {
+			t.Logf("bead %s: %s", beadID, status)
+			lastStatus = status
+		}
+		time.Sleep(10 * time.Second)
+	}
+	t.Fatalf("bead %s did not close within %s:\n%s", beadID, timeout, out)
+}
+
+// listUserFiles returns non-infrastructure file names in a directory.
+func listUserFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("reading %s: %v", dir, err)
+	}
+	var files []string
+	for _, e := range entries {
+		switch e.Name() {
+		case ".beads", ".gitignore", ".git", ".gc", ".runtime":
+			continue
+		}
+		files = append(files, e.Name())
+	}
+	return files
+}
+
+// extractSlingBeadID extracts the bead ID from gc sling output.
+func extractSlingBeadID(t *testing.T, output string) string {
+	t.Helper()
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "Slung") {
+			fields := strings.Fields(line)
+			for i, f := range fields {
+				if f == "Slung" && i+1 < len(fields) {
+					return fields[i+1]
+				}
+			}
+		}
+		if strings.Contains(line, "Created") {
+			fields := strings.Fields(line)
+			for i, f := range fields {
+				if f == "Created" && i+1 < len(fields) {
+					return strings.TrimRight(fields[i+1], " —")
+				}
+			}
+		}
+	}
+	t.Fatalf("could not extract bead ID from sling output:\n%s", output)
+	return ""
 }
 
 // readFile reads a file and returns its content as a string.
