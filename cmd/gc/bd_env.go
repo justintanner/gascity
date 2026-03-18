@@ -43,14 +43,13 @@ func bdRuntimeEnv(cityPath string) map[string]string {
 }
 
 func cityRuntimeProcessEnv(cityPath string) []string {
-	env := mergeRuntimeEnv(os.Environ(), citylayout.CityRuntimeEnvMap(cityPath))
-	if rawBeadsProvider(cityPath) != "bd" {
-		return env
+	overrides := citylayout.CityRuntimeEnvMap(cityPath)
+	if rawBeadsProvider(cityPath) == "bd" {
+		if port := currentDoltPort(cityPath); port != "" {
+			overrides["GC_DOLT_PORT"] = port
+		}
 	}
-	if port := currentDoltPort(cityPath); port != "" {
-		env = mergeRuntimeEnv(env, map[string]string{"GC_DOLT_PORT": port})
-	}
-	return env
+	return mergeRuntimeEnv(os.Environ(), overrides)
 }
 
 func cityForStoreDir(dir string) string {
