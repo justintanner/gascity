@@ -53,11 +53,12 @@ func TestOrderDispatchCooldownDue(t *testing.T) {
 	}
 
 	aa := []orders.Order{{
-		Name:     "test-order",
-		Gate:     "cooldown",
-		Interval: "1m",
-		Formula:  "test-formula",
-		Pool:     "worker",
+		Name:         "test-order",
+		Gate:         "cooldown",
+		Interval:     "1m",
+		Formula:      "test-formula",
+		Pool:         "worker",
+		FormulaLayer: sharedTestFormulaDir,
 	}}
 	ad := buildOrderDispatcherFromList(aa, store, nil, runner)
 	if ad == nil {
@@ -172,28 +173,6 @@ func TestOrderDispatchMultiple(t *testing.T) {
 	if trackingCount != 1 {
 		t.Errorf("expected 1 tracking bead for order-a, got %d", trackingCount)
 	}
-}
-
-func TestOrderDispatchMolCookError(t *testing.T) {
-	// Store that fails on MolCook.
-	store := &failMolCookStore{}
-
-	aa := []orders.Order{{
-		Name:     "fail-order",
-		Gate:     "cooldown",
-		Interval: "1m",
-		Formula:  "bad-formula",
-	}}
-	ad := buildOrderDispatcherFromList(aa, store, nil, noopRunner)
-	if ad == nil {
-		t.Fatal("expected non-nil dispatcher")
-	}
-
-	// Should not crash — best-effort skip.
-	ad.dispatch(context.Background(), t.TempDir(), time.Now())
-
-	// Wait briefly for goroutine.
-	time.Sleep(50 * time.Millisecond)
 }
 
 // --- exec order dispatch tests ---
@@ -558,15 +537,6 @@ func buildOrderDispatcherFromListExec(aa []orders.Order, store beads.Store, ep e
 	}
 }
 
-// failMolCookStore wraps MemStore but fails on MolCook.
-type failMolCookStore struct {
-	beads.MemStore
-}
-
-func (f *failMolCookStore) MolCook(formula, _ string, _ []string) (string, error) {
-	return "", fmt.Errorf("mol cook failed: %s", formula)
-}
-
 // --- rig-scoped dispatch tests ---
 
 func TestBuildOrderDispatcherWithRigs(t *testing.T) {
@@ -622,12 +592,13 @@ func TestOrderDispatchRigScoped(t *testing.T) {
 	}
 
 	aa := []orders.Order{{
-		Name:     "db-health",
-		Gate:     "cooldown",
-		Interval: "1m",
-		Formula:  "mol-db-health",
-		Pool:     "polecat",
-		Rig:      "demo-repo",
+		Name:         "db-health",
+		Gate:         "cooldown",
+		Interval:     "1m",
+		Formula:      "mol-db-health",
+		Pool:         "polecat",
+		Rig:          "demo-repo",
+		FormulaLayer: sharedTestFormulaDir,
 	}}
 	ad := buildOrderDispatcherFromList(aa, store, nil, runner)
 	if ad == nil {

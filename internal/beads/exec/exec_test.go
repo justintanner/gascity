@@ -57,10 +57,6 @@ case "$op" in
   set-metadata)
     cat > /dev/null  # consume stdin
     ;;
-  mol-cook)
-    cat > /dev/null  # consume stdin
-    echo "EX-99"
-    ;;
   *) exit 2 ;;  # unknown operation
 esac
 `
@@ -382,75 +378,6 @@ esac
 	}
 	if string(data) != "mr" {
 		t.Errorf("metadata value = %q, want %q", string(data), "mr")
-	}
-}
-
-func TestMolCook(t *testing.T) {
-	dir := t.TempDir()
-	script := writeScript(t, dir, allOpsScript())
-	s := NewStore(script)
-
-	id, err := s.MolCook("code-review", "Review PR #42", nil)
-	if err != nil {
-		t.Fatalf("MolCook: %v", err)
-	}
-	if id != "EX-99" {
-		t.Errorf("MolCook ID = %q, want %q", id, "EX-99")
-	}
-}
-
-func TestMolCook_stdinReachesScript(t *testing.T) {
-	dir := t.TempDir()
-	outFile := filepath.Join(dir, "stdin.json")
-
-	script := writeScript(t, dir, `
-case "$1" in
-  mol-cook)
-    cat > "`+outFile+`"
-    echo "EX-42"
-    ;;
-  *) exit 2 ;;
-esac
-`)
-	s := NewStore(script)
-
-	_, err := s.MolCook("deploy", "Deploy v2", []string{"env=prod"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	data, err := os.ReadFile(outFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stdin := string(data)
-	if !strings.Contains(stdin, `"formula":"deploy"`) {
-		t.Errorf("stdin missing formula, got: %s", stdin)
-	}
-	if !strings.Contains(stdin, `"title":"Deploy v2"`) {
-		t.Errorf("stdin missing title, got: %s", stdin)
-	}
-	if !strings.Contains(stdin, `"env=prod"`) {
-		t.Errorf("stdin missing vars, got: %s", stdin)
-	}
-}
-
-func TestMolCook_emptyOutput(t *testing.T) {
-	dir := t.TempDir()
-	script := writeScript(t, dir, `
-case "$1" in
-  mol-cook) cat > /dev/null ;; # empty stdout
-  *) exit 2 ;;
-esac
-`)
-	s := NewStore(script)
-
-	_, err := s.MolCook("deploy", "", nil)
-	if err == nil {
-		t.Fatal("expected error for empty mol-cook output")
-	}
-	if !strings.Contains(err.Error(), "empty output") {
-		t.Errorf("error = %q, want to contain 'empty output'", err)
 	}
 }
 

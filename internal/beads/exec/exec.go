@@ -289,51 +289,6 @@ func (s *Store) Ping() error {
 	return nil
 }
 
-// MolCook instantiates a molecule from a formula by delegating to the
-// script's mol-cook operation. Returns the root bead ID.
-func (s *Store) MolCook(formulaName, title string, vars []string) (string, error) {
-	data, err := marshalMolCook(formulaName, title, vars)
-	if err != nil {
-		return "", fmt.Errorf("exec beads mol-cook: marshaling: %w", err)
-	}
-	out, err := s.run(data, "mol-cook")
-	if err != nil {
-		return "", fmt.Errorf("exec beads mol-cook: %w", err)
-	}
-	rootID := strings.TrimSpace(out)
-	if rootID == "" {
-		return "", fmt.Errorf("exec beads mol-cook produced empty output")
-	}
-	return rootID, nil
-}
-
-// MolCookOn instantiates a molecule attached to an existing bead. Delegates
-// to the script's mol-cook-on operation with the bead ID.
-func (s *Store) MolCookOn(formulaName, beadID, title string, vars []string) (string, error) {
-	data, err := marshalMolCook(formulaName, title, vars)
-	if err != nil {
-		return "", fmt.Errorf("exec beads mol-cook-on: marshaling: %w", err)
-	}
-	// Augment JSON payload with the target bead ID.
-	var payload map[string]interface{}
-	if jErr := json.Unmarshal(data, &payload); jErr == nil {
-		payload["on"] = beadID
-		data, _ = json.Marshal(payload)
-	}
-	out, err := s.run(data, "mol-cook-on")
-	if err != nil {
-		if isNotFoundError(err) {
-			return "", fmt.Errorf("exec beads mol-cook-on: bead %q: %w", beadID, beads.ErrNotFound)
-		}
-		return "", fmt.Errorf("exec beads mol-cook-on: %w", err)
-	}
-	rootID := strings.TrimSpace(out)
-	if rootID == "" {
-		return "", fmt.Errorf("exec beads mol-cook-on produced empty output")
-	}
-	return rootID, nil
-}
-
 // DepAdd delegates dependency creation to the script's dep-add operation.
 func (s *Store) DepAdd(issueID, dependsOnID, depType string) error {
 	_, err := s.run(nil, "dep-add", issueID, dependsOnID, depType)

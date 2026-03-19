@@ -14,6 +14,7 @@ import (
 	"github.com/gastownhall/gascity/internal/beads"
 	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/gastownhall/gascity/internal/molecule"
 	"github.com/gastownhall/gascity/internal/runtime"
 	"github.com/gastownhall/gascity/internal/shellquote"
 	"github.com/gastownhall/gascity/internal/telemetry"
@@ -419,12 +420,15 @@ func doSling(opts slingOpts, deps slingDeps, querier BeadQuerier) int {
 	if opts.IsFormula {
 		method = "formula"
 		formulaVars := buildSlingFormulaVars(opts.BeadOrFormula, "", opts.Vars, a, deps)
-		rootID, err := deps.Store.MolCook(opts.BeadOrFormula, opts.Title, formulaVars)
+		result, err := molecule.Cook(context.Background(), deps.Store, opts.BeadOrFormula, slingFormulaSearchPaths(deps), molecule.Options{
+			Title: opts.Title,
+			Vars:  formulaVars,
+		})
 		if err != nil {
 			fmt.Fprintf(deps.Stderr, "gc sling: instantiating formula %q: %v\n", opts.BeadOrFormula, err) //nolint:errcheck // best-effort
 			return 1
 		}
-		beadID = rootID
+		beadID = result.RootID
 	}
 
 	// If --on, attach a wisp to the bead and route the original bead.
@@ -435,11 +439,16 @@ func doSling(opts slingOpts, deps slingDeps, querier BeadQuerier) int {
 			return 1
 		}
 		formulaVars := buildSlingFormulaVars(opts.OnFormula, beadID, opts.Vars, a, deps)
-		wispRootID, err := deps.Store.MolCookOn(opts.OnFormula, beadID, opts.Title, formulaVars)
+		result, err := molecule.Cook(context.Background(), deps.Store, opts.OnFormula, slingFormulaSearchPaths(deps), molecule.Options{
+			Title:    opts.Title,
+			Vars:     formulaVars,
+			ParentID: beadID,
+		})
 		if err != nil {
 			fmt.Fprintf(deps.Stderr, "gc sling: instantiating formula %q on %s: %v\n", opts.OnFormula, beadID, err) //nolint:errcheck // best-effort
 			return 1
 		}
+		wispRootID := result.RootID
 		// Record molecule_id on the work bead so agents can discover it
 		// without traversing dependencies.
 		if err := deps.Store.SetMetadata(beadID, "molecule_id", wispRootID); err != nil {
@@ -458,12 +467,17 @@ func doSling(opts slingOpts, deps slingDeps, querier BeadQuerier) int {
 			return 1
 		}
 		defaultVars := buildSlingFormulaVars(a.DefaultSlingFormula, beadID, opts.Vars, a, deps)
-		wispRootID, err := deps.Store.MolCookOn(a.DefaultSlingFormula, beadID, opts.Title, defaultVars)
+		result, err := molecule.Cook(context.Background(), deps.Store, a.DefaultSlingFormula, slingFormulaSearchPaths(deps), molecule.Options{
+			Title:    opts.Title,
+			Vars:     defaultVars,
+			ParentID: beadID,
+		})
 		if err != nil {
 			fmt.Fprintf(deps.Stderr, "gc sling: instantiating default formula %q on %s: %v\n", //nolint:errcheck // best-effort
 				a.DefaultSlingFormula, beadID, err)
 			return 1
 		}
+		wispRootID := result.RootID
 		// Record molecule_id on the work bead so agents can discover it
 		// without traversing dependencies.
 		if err := deps.Store.SetMetadata(beadID, "molecule_id", wispRootID); err != nil {
@@ -654,27 +668,35 @@ func doSlingBatch(opts slingOpts, deps slingDeps, querier BeadChildQuerier) int 
 		// Attach wisp if --on.
 		if opts.OnFormula != "" {
 			childVars := buildSlingFormulaVars(opts.OnFormula, child.ID, opts.Vars, a, deps)
-			wispRootID, err := deps.Store.MolCookOn(opts.OnFormula, child.ID, opts.Title, childVars)
+			cookResult, err := molecule.Cook(context.Background(), deps.Store, opts.OnFormula, slingFormulaSearchPaths(deps), molecule.Options{
+				Title:    opts.Title,
+				Vars:     childVars,
+				ParentID: child.ID,
+			})
 			if err != nil {
 				fmt.Fprintf(deps.Stderr, "  Failed %s: instantiating formula %q: %v\n", child.ID, opts.OnFormula, err) //nolint:errcheck // best-effort
 				telemetry.RecordSling(context.Background(), a.QualifiedName(), targetType(&a), batchMethod, err)
 				failed++
 				continue
 			}
-			_ = deps.Store.SetMetadata(child.ID, "molecule_id", wispRootID)             // best-effort
-			fmt.Fprintf(deps.Stdout, "  Attached wisp %s → %s\n", wispRootID, child.ID) //nolint:errcheck // best-effort
+			_ = deps.Store.SetMetadata(child.ID, "molecule_id", cookResult.RootID)             // best-effort
+			fmt.Fprintf(deps.Stdout, "  Attached wisp %s → %s\n", cookResult.RootID, child.ID) //nolint:errcheck // best-effort
 		} else if !opts.NoFormula && a.DefaultSlingFormula != "" {
 			// Apply default formula per-child.
 			childVars := buildSlingFormulaVars(a.DefaultSlingFormula, child.ID, opts.Vars, a, deps)
-			wispRootID, err := deps.Store.MolCookOn(a.DefaultSlingFormula, child.ID, opts.Title, childVars)
+			cookResult, err := molecule.Cook(context.Background(), deps.Store, a.DefaultSlingFormula, slingFormulaSearchPaths(deps), molecule.Options{
+				Title:    opts.Title,
+				Vars:     childVars,
+				ParentID: child.ID,
+			})
 			if err != nil {
 				fmt.Fprintf(deps.Stderr, "  Failed %s: instantiating default formula %q: %v\n", child.ID, a.DefaultSlingFormula, err) //nolint:errcheck // best-effort
 				telemetry.RecordSling(context.Background(), a.QualifiedName(), targetType(&a), batchMethod, err)
 				failed++
 				continue
 			}
-			_ = deps.Store.SetMetadata(child.ID, "molecule_id", wispRootID)                               // best-effort
-			fmt.Fprintf(deps.Stdout, "  Attached wisp %s (default formula) → %s\n", wispRootID, child.ID) //nolint:errcheck // best-effort
+			_ = deps.Store.SetMetadata(child.ID, "molecule_id", cookResult.RootID)                               // best-effort
+			fmt.Fprintf(deps.Stdout, "  Attached wisp %s (default formula) → %s\n", cookResult.RootID, child.ID) //nolint:errcheck // best-effort
 		}
 
 		childEnv := resolveSlingEnv(a, deps)
@@ -717,21 +739,22 @@ func doSlingBatch(opts slingOpts, deps slingDeps, querier BeadChildQuerier) int 
 
 // buildSlingFormulaVars merges caller-provided vars with the runtime context
 // needed by common work formulas. Explicit --var entries always win.
-func buildSlingFormulaVars(formula, beadID string, userVars []string, a config.Agent, deps slingDeps) []string {
-	vars := append([]string(nil), userVars...)
-	explicit := make(map[string]bool, len(userVars))
+func buildSlingFormulaVars(formulaName, beadID string, userVars []string, a config.Agent, deps slingDeps) map[string]string {
+	vars := make(map[string]string, len(userVars)+3)
 	for _, v := range userVars {
-		key, _, ok := strings.Cut(v, "=")
+		key, value, ok := strings.Cut(v, "=")
 		if ok && key != "" {
-			explicit[key] = true
+			vars[key] = value
 		}
 	}
 	addVar := func(key, value string) {
-		if value == "" || explicit[key] {
+		if value == "" {
 			return
 		}
-		vars = append(vars, key+"="+value)
-		explicit[key] = true
+		if _, explicit := vars[key]; explicit {
+			return
+		}
+		vars[key] = value
 	}
 
 	if beadID != "" {
@@ -740,14 +763,25 @@ func buildSlingFormulaVars(formula, beadID string, userVars []string, a config.A
 	}
 
 	autoBranch := slingFormulaTargetBranch(beadID, deps, a)
-	if slingFormulaUsesBaseBranch(formula) {
+	if slingFormulaUsesBaseBranch(formulaName) {
 		addVar("base_branch", autoBranch)
 	}
-	if slingFormulaUsesTargetBranch(formula) {
+	if slingFormulaUsesTargetBranch(formulaName) {
 		addVar("target_branch", autoBranch)
 	}
 
 	return vars
+}
+
+// slingFormulaSearchPaths returns the formula search paths for the current
+// sling context. Uses the city's resolved FormulaLayers.
+func slingFormulaSearchPaths(deps slingDeps) []string {
+	if deps.Cfg == nil {
+		return nil
+	}
+	// Use city-level layers — formulas are already resolved per-rig during
+	// city startup via ResolveFormulas() symlink staging.
+	return deps.Cfg.FormulaLayers.City
 }
 
 func slingFormulaTargetBranch(beadID string, deps slingDeps, a config.Agent) string {

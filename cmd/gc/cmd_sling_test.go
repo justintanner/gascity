@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,54 +18,25 @@ import (
 	"github.com/gastownhall/gascity/internal/shellquote"
 )
 
-// errStore wraps a beads.Store and injects errors into MolCook/MolCookOn.
-type errStore struct {
-	beads.Store
-	cookErr error
-}
-
-func (e *errStore) MolCook(formula, title string, vars []string) (string, error) {
-	if e.cookErr != nil {
-		return "", e.cookErr
-	}
-	return e.Store.MolCook(formula, title, vars)
-}
-
-func (e *errStore) MolCookOn(formula, beadID, title string, vars []string) (string, error) {
-	if e.cookErr != nil {
-		return "", e.cookErr
-	}
-	return e.Store.MolCookOn(formula, beadID, title, vars)
-}
-
-// selectiveErrStore wraps a beads.Store and injects errors for specific bead IDs
-// in MolCookOn. Used to test partial cook failures in batch operations.
+// selectiveErrStore wraps a beads.Store and injects Create errors when the
+// bead's ParentID matches a specified ID. Used to test partial cook failures
+// in batch operations where molecule.Cook fails for specific parent beads.
 type selectiveErrStore struct {
 	beads.Store
-	failOnBeadIDs map[string]error
+	failOnParentIDs map[string]error
 }
 
-func (s *selectiveErrStore) MolCookOn(formula, beadID, title string, vars []string) (string, error) {
-	if err, ok := s.failOnBeadIDs[beadID]; ok {
-		return "", err
+func (s *selectiveErrStore) Create(b beads.Bead) (beads.Bead, error) {
+	if err, ok := s.failOnParentIDs[b.ParentID]; ok {
+		return beads.Bead{}, err
 	}
-	return s.Store.MolCookOn(formula, beadID, title, vars)
+	return s.Store.Create(b)
 }
 
-type cookCall struct {
-	formula string
-	beadID  string
-	title   string
-	vars    []string
-}
-
-// recordingStore wraps a store and records MolCook/MolCookOn calls for
-// assertions about formula var injection.
+// recordingStore wraps a store and overrides Get for bead injection.
 type recordingStore struct {
 	beads.Store
 	beadsByID map[string]beads.Bead
-	cookCalls []cookCall
-	onCalls   []cookCall
 }
 
 func (s *recordingStore) Get(id string) (beads.Bead, error) {
@@ -71,25 +44,6 @@ func (s *recordingStore) Get(id string) (beads.Bead, error) {
 		return b, nil
 	}
 	return s.Store.Get(id)
-}
-
-func (s *recordingStore) MolCook(formula, title string, vars []string) (string, error) {
-	s.cookCalls = append(s.cookCalls, cookCall{
-		formula: formula,
-		title:   title,
-		vars:    append([]string(nil), vars...),
-	})
-	return s.Store.MolCook(formula, title, vars)
-}
-
-func (s *recordingStore) MolCookOn(formula, beadID, title string, vars []string) (string, error) {
-	s.onCalls = append(s.onCalls, cookCall{
-		formula: formula,
-		beadID:  beadID,
-		title:   title,
-		vars:    append([]string(nil), vars...),
-	})
-	return s.Store.MolCookOn(formula, beadID, title, vars)
 }
 
 // fakeRunnerRule maps a command substring to a canned response.
@@ -131,8 +85,12 @@ func testOpts(a config.Agent, beadOrFormula string) slingOpts {
 }
 
 // testDeps constructs a slingDeps for testing, returning the deps and
-// stdout/stderr buffers for inspection.
+// stdout/stderr buffers for inspection. The config's FormulaLayers.City
+// is automatically populated with common test formulas.
 func testDeps(cfg *config.City, sp runtime.Provider, runner SlingRunner) (slingDeps, *bytes.Buffer, *bytes.Buffer) {
+	if cfg != nil && len(cfg.FormulaLayers.City) == 0 {
+		cfg.FormulaLayers.City = []string{sharedTestFormulaDir}
+	}
 	var stdout, stderr bytes.Buffer
 	return slingDeps{
 		CityName: "test-city",
@@ -144,6 +102,48 @@ func testDeps(cfg *config.City, sp runtime.Provider, runner SlingRunner) (slingD
 		Stdout:   &stdout,
 		Stderr:   &stderr,
 	}, &stdout, &stderr
+}
+
+// sharedTestFormulaDir is a package-level temp directory containing minimal
+// formula TOML files for all formula names commonly used in sling tests.
+var sharedTestFormulaDir string
+
+func init() {
+	dir, err := os.MkdirTemp("", "gc-sling-test-formulas-*")
+	if err != nil {
+		panic(err)
+	}
+	for _, name := range []string{
+		"code-review", "mol-feature", "mol-polecat-work", "mol-do-work",
+		"mol-refinery-patrol", "review", "build", "test-formula",
+		"bad-formula", "mol-polecat-pr", "custom-formula",
+		"mol-digest", "mol-cleanup", "mol-db-health", "mol-health-check",
+		"my-formula", "convoy-formula",
+	} {
+		content := fmt.Sprintf("formula = %q\nversion = 1\n\n[[steps]]\nid = \"work\"\ntitle = \"Work\"\n", name)
+		_ = os.WriteFile(filepath.Join(dir, name+".formula.toml"), []byte(content), 0o644)
+	}
+	sharedTestFormulaDir = dir
+}
+
+// testFormulaDir creates a temporary directory with minimal formula TOML files
+// for the given formula names. Returns the directory path.
+func testFormulaDir(t *testing.T, names ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, name := range names {
+		content := fmt.Sprintf("formula = %q\nversion = 1\n\n[[steps]]\nid = \"work\"\ntitle = \"Work\"\n", name)
+		if err := os.WriteFile(filepath.Join(dir, name+".formula.toml"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+// defaultTestFormulas are formula names used across sling tests.
+var defaultTestFormulas = []string{
+	"code-review", "mol-feature", "mol-polecat-work", "mol-do-work",
+	"mol-refinery-patrol", "review", "build", "test-formula",
 }
 
 func gitCmd(t *testing.T, dir string, args ...string) {
@@ -162,14 +162,9 @@ func newRepoWithOriginHead(t *testing.T, branch string) string {
 	return dir
 }
 
-func findVarValue(vars []string, key string) (string, bool) {
-	for _, v := range vars {
-		k, value, ok := strings.Cut(v, "=")
-		if ok && k == key {
-			return value, true
-		}
-	}
-	return "", false
+func findVarValue(vars map[string]string, key string) (string, bool) {
+	v, ok := vars[key]
+	return v, ok
 }
 
 func TestBuildSlingCommand(t *testing.T) {
@@ -457,7 +452,6 @@ func TestDoSlingFormulaInstantiationError(t *testing.T) {
 	a := config.Agent{Name: "mayor"}
 
 	deps, _, stderr := testDeps(cfg, sp, runner.run)
-	deps.Store = &errStore{Store: beads.NewMemStore(), cookErr: fmt.Errorf("formula not found")}
 	opts := testOpts(a, "nonexistent")
 	opts.IsFormula = true
 	code := doSling(opts, deps, nil)
@@ -465,7 +459,7 @@ func TestDoSlingFormulaInstantiationError(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("doSling returned %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "formula not found") {
+	if !strings.Contains(stderr.String(), "not found") {
 		t.Errorf("stderr = %q, want formula error", stderr.String())
 	}
 }
@@ -1340,36 +1334,34 @@ func TestOnFormulaCookError(t *testing.T) {
 	a := config.Agent{Name: "mayor"}
 
 	deps, _, stderr := testDeps(cfg, sp, runner.run)
-	deps.Store = &errStore{Store: beads.NewMemStore(), cookErr: fmt.Errorf("formula not found")}
 	opts := testOpts(a, "BL-42")
-	opts.OnFormula = "bad-formula"
+	opts.OnFormula = "nonexistent-formula"
 	code := doSling(opts, deps, nil)
 
 	if code != 1 {
 		t.Fatalf("doSling returned %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "formula not found") {
+	if !strings.Contains(stderr.String(), "not found") {
 		t.Errorf("stderr = %q, want formula error", stderr.String())
 	}
 }
 
-func TestOnFormulaCookEmpty(t *testing.T) {
+func TestOnFormulaCookMissingFormula(t *testing.T) {
 	runner := newFakeRunner()
 	sp := runtime.NewFake()
 	cfg := &config.City{Workspace: config.Workspace{Name: "test-city"}}
 	a := config.Agent{Name: "mayor"}
 
 	deps, _, stderr := testDeps(cfg, sp, runner.run)
-	deps.Store = &errStore{Store: beads.NewMemStore(), cookErr: fmt.Errorf("empty output from mol cook")}
 	opts := testOpts(a, "BL-42")
-	opts.OnFormula = "code-review"
+	opts.OnFormula = "totally-missing"
 	code := doSling(opts, deps, nil)
 
 	if code != 1 {
 		t.Fatalf("doSling returned %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "empty output") {
-		t.Errorf("stderr = %q, want 'empty output'", stderr.String())
+	if !strings.Contains(stderr.String(), "not found") {
+		t.Errorf("stderr = %q, want 'not found'", stderr.String())
 	}
 }
 
@@ -1584,15 +1576,16 @@ func TestBatchOnConvoy(t *testing.T) {
 		t.Errorf("got %d molecule beads in store, want 3", molCount)
 	}
 	out := stdout.String()
-	// MemStore generates IDs like gc-1, gc-2, gc-3.
+	// MemStore generates IDs gc-1, gc-2, ... Each molecule.Cook creates
+	// 2 beads (root + step), so wisp root IDs are gc-1, gc-3, gc-5.
 	if !strings.Contains(out, "Attached wisp gc-1") {
 		t.Errorf("stdout = %q, want gc-1 attach", out)
 	}
-	if !strings.Contains(out, "Attached wisp gc-2") {
-		t.Errorf("stdout = %q, want gc-2 attach", out)
-	}
 	if !strings.Contains(out, "Attached wisp gc-3") {
 		t.Errorf("stdout = %q, want gc-3 attach", out)
+	}
+	if !strings.Contains(out, "Attached wisp gc-5") {
+		t.Errorf("stdout = %q, want gc-5 attach", out)
 	}
 	if !strings.Contains(out, "Slung 3/3 children") {
 		t.Errorf("stdout = %q, want summary", out)
@@ -1712,10 +1705,10 @@ func TestBatchOnPartialCookFailure(t *testing.T) {
 	}
 
 	deps, stdout, stderr := testDeps(cfg, sp, runner.run)
-	// Fail MolCookOn for BL-2 only.
+	// Fail molecule.Cook when creating beads parented to BL-2.
 	deps.Store = &selectiveErrStore{
-		Store:         beads.NewMemStore(),
-		failOnBeadIDs: map[string]error{"BL-2": fmt.Errorf("cook failed for BL-2")},
+		Store:           beads.NewMemStore(),
+		failOnParentIDs: map[string]error{"BL-2": fmt.Errorf("cook failed for BL-2")},
 	}
 	opts := testOpts(a, "CVY-1")
 	opts.OnFormula = "code-review"
@@ -3322,9 +3315,7 @@ func TestBuildSlingFormulaVarsSeedsRefineryTargetBranch(t *testing.T) {
 	}
 }
 
-func TestDoSlingExplicitOnInjectsIssueAndBaseBranch(t *testing.T) {
-	runner := newFakeRunner()
-	sp := runtime.NewFake()
+func TestBuildSlingFormulaVarsInjectsIssueAndBaseBranch(t *testing.T) {
 	cfg := &config.City{
 		Workspace: config.Workspace{Name: "test-city"},
 		Rigs: []config.Rig{
@@ -3337,7 +3328,7 @@ func TestDoSlingExplicitOnInjectsIssueAndBaseBranch(t *testing.T) {
 		Pool: &config.PoolConfig{Min: 0, Max: 5},
 	}
 
-	deps, _, stderr := testDeps(cfg, sp, runner.run)
+	deps, _, _ := testDeps(cfg, runtime.NewFake(), newFakeRunner().run)
 	store := &recordingStore{
 		Store: beads.NewMemStore(),
 		beadsByID: map[string]beads.Bead{
@@ -3348,20 +3339,13 @@ func TestDoSlingExplicitOnInjectsIssueAndBaseBranch(t *testing.T) {
 		},
 	}
 	deps.Store = store
-	opts := testOpts(a, "HW-42")
-	opts.OnFormula = "mol-polecat-work"
 
-	code := doSling(opts, deps, nil)
-	if code != 0 {
-		t.Fatalf("doSling returned %d, want 0; stderr: %s", code, stderr.String())
-	}
-	if len(store.onCalls) != 1 {
-		t.Fatalf("got %d MolCookOn calls, want 1", len(store.onCalls))
-	}
-	if got, ok := findVarValue(store.onCalls[0].vars, "issue"); !ok || got != "HW-42" {
+	vars := buildSlingFormulaVars("mol-polecat-work", "HW-42", nil, a, deps)
+
+	if got, ok := findVarValue(vars, "issue"); !ok || got != "HW-42" {
 		t.Fatalf("issue var = %q, %v; want HW-42, true", got, ok)
 	}
-	if got, ok := findVarValue(store.onCalls[0].vars, "base_branch"); !ok || got != "integration/convoy-7" {
+	if got, ok := findVarValue(vars, "base_branch"); !ok || got != "integration/convoy-7" {
 		t.Fatalf("base_branch var = %q, %v; want integration/convoy-7, true", got, ok)
 	}
 }

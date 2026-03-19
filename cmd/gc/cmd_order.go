@@ -12,6 +12,7 @@ import (
 	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/events"
 	"github.com/gastownhall/gascity/internal/fsys"
+	"github.com/gastownhall/gascity/internal/molecule"
 	"github.com/gastownhall/gascity/internal/orders"
 	"github.com/spf13/cobra"
 )
@@ -437,11 +438,16 @@ func doOrderRun(aa []orders.Order, name, rig, cityPath string, runner SlingRunne
 	}
 
 	// Instantiate wisp from formula.
-	rootID, err := store.MolCook(a.Formula, "", nil)
+	var searchPaths []string
+	if a.FormulaLayer != "" {
+		searchPaths = []string{a.FormulaLayer}
+	}
+	cookResult, err := molecule.Cook(context.Background(), store, a.Formula, searchPaths, molecule.Options{})
 	if err != nil {
 		fmt.Fprintf(stderr, "gc order run: %v\n", err) //nolint:errcheck // best-effort stderr
 		return 1
 	}
+	rootID := cookResult.RootID
 
 	// Label with order-run:<scopedName> for tracking, plus pool routing if specified.
 	// For event gates, also add order:<scopedName> and seq:<headSeq> for cursor tracking.

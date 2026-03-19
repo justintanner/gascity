@@ -37,13 +37,6 @@ type updateRequest struct {
 	RemoveLabels []string `json:"remove_labels,omitempty"`
 }
 
-// molCookRequest is the JSON wire format sent on stdin for mol-cook.
-type molCookRequest struct {
-	Formula string   `json:"formula"`
-	Title   string   `json:"title,omitempty"`
-	Vars    []string `json:"vars,omitempty"`
-}
-
 // beadWire is the JSON wire format returned by the script for bead data.
 // Matches [beads.Bead] JSON tags — the same shape that bd already produces.
 type beadWire struct {
@@ -88,16 +81,6 @@ func marshalUpdate(opts beads.UpdateOpts) ([]byte, error) {
 		Assignee:     opts.Assignee,
 		Labels:       opts.Labels,
 		RemoveLabels: opts.RemoveLabels,
-	}
-	return json.Marshal(r)
-}
-
-// marshalMolCook converts mol-cook parameters to JSON for the exec script.
-func marshalMolCook(formula, title string, vars []string) ([]byte, error) {
-	r := molCookRequest{
-		Formula: formula,
-		Title:   title,
-		Vars:    vars,
 	}
 	return json.Marshal(r)
 }

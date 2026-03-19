@@ -275,41 +275,6 @@ func (m *MemStore) Ping() error {
 	return nil
 }
 
-// MolCook instantiates an ephemeral molecule (wisp) from a formula and returns
-// the root bead ID. MemStore creates a bead with Type "molecule" and the
-// formula name as Ref.
-func (m *MemStore) MolCook(formula, title string, _ []string) (string, error) {
-	if title == "" {
-		title = formula
-	}
-	b, err := m.Create(Bead{
-		Title: title,
-		Type:  "molecule",
-		Ref:   formula,
-	})
-	if err != nil {
-		return "", fmt.Errorf("mol cook %q: %w", formula, err)
-	}
-	return b.ID, nil
-}
-
-// MolCookOn instantiates an ephemeral molecule attached to an existing bead.
-func (m *MemStore) MolCookOn(formula, beadID, title string, _ []string) (string, error) {
-	if title == "" {
-		title = formula
-	}
-	b, err := m.Create(Bead{
-		Title:    title,
-		Type:     "molecule",
-		Ref:      formula,
-		ParentID: beadID,
-	})
-	if err != nil {
-		return "", fmt.Errorf("mol cook --on %q: %w", formula, err)
-	}
-	return b.ID, nil
-}
-
 // DepAdd records a dependency: issueID depends on dependsOnID.
 func (m *MemStore) DepAdd(issueID, dependsOnID, depType string) error {
 	m.mu.Lock()

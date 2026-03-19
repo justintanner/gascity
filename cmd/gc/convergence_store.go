@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/gastownhall/gascity/internal/beads"
 	"github.com/gastownhall/gascity/internal/convergence"
 	"github.com/gastownhall/gascity/internal/events"
+	"github.com/gastownhall/gascity/internal/molecule"
 )
 
 // convergenceStoreAdapter bridges beads.Store to convergence.Store.
@@ -17,8 +19,9 @@ import (
 // once at startup and maintained on state transitions via SetMetadata.
 // No mutex is needed — single-writer event loop.
 type convergenceStoreAdapter struct {
-	store       beads.Store
-	activeIndex map[string]string // bead ID → target agent; nil until populateIndex
+	store              beads.Store
+	formulaSearchPaths []string          // search paths for formula compilation in PourWisp
+	activeIndex        map[string]string // bead ID → target agent; nil until populateIndex
 }
 
 var _ convergence.Store = (*convergenceStoreAdapter)(nil)
@@ -145,25 +148,23 @@ func (a *convergenceStoreAdapter) PourWisp(parentID, formula, idempotencyKey str
 		return existing, nil
 	}
 
-	// Build vars list from map.
-	var varList []string
+	// Build vars map with evaluate_prompt if set.
+	cookVars := make(map[string]string, len(vars)+1)
 	for k, v := range vars {
-		varList = append(varList, k+"="+v)
+		cookVars[k] = v
 	}
 	if evaluatePrompt != "" {
-		varList = append(varList, "evaluate_prompt="+evaluatePrompt)
+		cookVars["evaluate_prompt"] = evaluatePrompt
 	}
-	wispID, err := a.store.MolCookOn(formula, parentID, "", varList)
+	result, err := molecule.Cook(context.Background(), a.store, formula, a.formulaSearchPaths, molecule.Options{
+		Vars:           cookVars,
+		ParentID:       parentID,
+		IdempotencyKey: idempotencyKey,
+	})
 	if err != nil {
 		return "", err
 	}
-	// Set the idempotency key on the wisp atomically (single lock for MemStore/FileStore).
-	if setErr := a.store.SetMetadataBatch(wispID, map[string]string{
-		"idempotency_key": idempotencyKey,
-	}); setErr != nil {
-		return wispID, fmt.Errorf("wisp created (%s) but failed to set idempotency key: %w", wispID, setErr)
-	}
-	return wispID, nil
+	return result.RootID, nil
 }
 
 func (a *convergenceStoreAdapter) FindByIdempotencyKey(key string) (string, bool, error) {

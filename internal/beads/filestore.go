@@ -101,40 +101,6 @@ func (fs *FileStore) Close(id string) error {
 	return nil
 }
 
-// MolCook delegates to MemStore.MolCook and flushes to disk.
-// If the disk flush fails, the in-memory mutation is rolled back.
-func (fs *FileStore) MolCook(formula, title string, vars []string) (string, error) {
-	fs.fmu.Lock()
-	defer fs.fmu.Unlock()
-	snap := fs.snapshotLocked()
-	id, err := fs.MemStore.MolCook(formula, title, vars)
-	if err != nil {
-		return "", err
-	}
-	if err := fs.save(); err != nil {
-		fs.restoreFrom(snap.seq, snap.beads, snap.deps)
-		return "", err
-	}
-	return id, nil
-}
-
-// MolCookOn delegates to MemStore.MolCookOn and flushes to disk.
-// If the disk flush fails, the in-memory mutation is rolled back.
-func (fs *FileStore) MolCookOn(formula, beadID, title string, vars []string) (string, error) {
-	fs.fmu.Lock()
-	defer fs.fmu.Unlock()
-	snap := fs.snapshotLocked()
-	id, err := fs.MemStore.MolCookOn(formula, beadID, title, vars)
-	if err != nil {
-		return "", err
-	}
-	if err := fs.save(); err != nil {
-		fs.restoreFrom(snap.seq, snap.beads, snap.deps)
-		return "", err
-	}
-	return id, nil
-}
-
 // SetMetadata delegates to MemStore.SetMetadata and flushes to disk.
 // If the disk flush fails, the in-memory mutation is rolled back.
 func (fs *FileStore) SetMetadata(id, key, value string) error {

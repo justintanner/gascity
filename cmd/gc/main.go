@@ -127,6 +127,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newSessionCmd(stdout, stderr),
 		newConvergeCmd(stdout, stderr),
 		newRuntimeCmd(stdout, stderr),
+		newFormulaCmd(stdout, stderr),
 	)
 	// gen-doc needs the root command to walk the tree; add after construction.
 	root.AddCommand(newGenDocCmd(stdout, stderr, root))

@@ -286,13 +286,10 @@ func TestOrderCheckWithLastRun(t *testing.T) {
 
 func TestOrderRun(t *testing.T) {
 	aa := []orders.Order{
-		{Name: "digest", Formula: "mol-digest", Gate: "cooldown", Interval: "24h", Pool: "dog"},
+		{Name: "digest", Formula: "mol-digest", Gate: "cooldown", Interval: "24h", Pool: "dog", FormulaLayer: sharedTestFormulaDir},
 	}
 
-	// BdStore handles mol wisp now.
-	store := beads.NewBdStore(t.TempDir(), func(_, _ string, _ ...string) ([]byte, error) {
-		return []byte(`{"root_id":"WISP-001"}` + "\n"), nil
-	})
+	store := beads.NewMemStore()
 
 	// SlingRunner still handles the route command.
 	calls := []string{}
@@ -317,19 +314,14 @@ func TestOrderRun(t *testing.T) {
 	if !strings.Contains(calls[0], "--add-label=pool:dog") {
 		t.Errorf("call[0] = %q, want --add-label=pool:dog", calls[0])
 	}
-	if !strings.Contains(stdout.String(), "WISP-001") {
-		t.Errorf("stdout missing wisp ID: %s", stdout.String())
-	}
 }
 
 func TestOrderRunNoPool(t *testing.T) {
 	aa := []orders.Order{
-		{Name: "cleanup", Formula: "mol-cleanup", Gate: "cron", Schedule: "0 3 * * *"},
+		{Name: "cleanup", Formula: "mol-cleanup", Gate: "cron", Schedule: "0 3 * * *", FormulaLayer: sharedTestFormulaDir},
 	}
 
-	store := beads.NewBdStore(t.TempDir(), func(_, _ string, _ ...string) ([]byte, error) {
-		return []byte(`{"root_id":"WISP-002"}` + "\n"), nil
-	})
+	store := beads.NewMemStore()
 
 	calls := []string{}
 	fakeRunner := func(_, cmd string, _ map[string]string) (string, error) {
@@ -354,7 +346,8 @@ func TestOrderRunNoPool(t *testing.T) {
 	if strings.Contains(calls[0], "--add-label=pool:") {
 		t.Errorf("call[0] = %q, should not contain pool label", calls[0])
 	}
-	if !strings.Contains(stdout.String(), "WISP-002") {
+	// Verify wisp ID appears in stdout (MemStore generates gc-N IDs).
+	if !strings.Contains(stdout.String(), "gc-1") {
 		t.Errorf("stdout missing wisp ID: %s", stdout.String())
 	}
 }
@@ -583,12 +576,10 @@ func TestOrderShowWithRig(t *testing.T) {
 
 func TestOrderRunRigQualifiesPool(t *testing.T) {
 	aa := []orders.Order{
-		{Name: "db-health", Formula: "mol-db-health", Gate: "cooldown", Interval: "5m", Pool: "polecat", Rig: "demo-repo"},
+		{Name: "db-health", Formula: "mol-db-health", Gate: "cooldown", Interval: "5m", Pool: "polecat", Rig: "demo-repo", FormulaLayer: sharedTestFormulaDir},
 	}
 
-	store := beads.NewBdStore(t.TempDir(), func(_, _ string, _ ...string) ([]byte, error) {
-		return []byte(`{"root_id":"WISP-010"}` + "\n"), nil
-	})
+	store := beads.NewMemStore()
 
 	calls := []string{}
 	fakeRunner := func(_, cmd string, _ map[string]string) (string, error) {

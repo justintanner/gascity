@@ -39,32 +39,6 @@ func TestMemStoreSetMetadataNotFound(t *testing.T) {
 	}
 }
 
-func TestMemStoreMolCook(t *testing.T) {
-	s := beads.NewMemStore()
-	id, err := s.MolCook("code-review", "Review PR #42", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id == "" {
-		t.Fatal("MolCook returned empty ID")
-	}
-
-	// Verify the created bead.
-	b, err := s.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if b.Type != "molecule" {
-		t.Errorf("Type = %q, want %q", b.Type, "molecule")
-	}
-	if b.Title != "Review PR #42" {
-		t.Errorf("Title = %q, want %q", b.Title, "Review PR #42")
-	}
-	if b.Ref != "code-review" {
-		t.Errorf("Ref = %q, want %q", b.Ref, "code-review")
-	}
-}
-
 func TestMemStoreListByLabel(t *testing.T) {
 	s := beads.NewMemStore()
 
@@ -167,22 +141,6 @@ func TestMemStoreAddAndRemoveLabels(t *testing.T) {
 	}
 	if len(got.Labels) != 2 || got.Labels[0] != "b" || got.Labels[1] != "c" {
 		t.Errorf("Labels = %v, want [b c]", got.Labels)
-	}
-}
-
-func TestMemStoreMolCookDefaultTitle(t *testing.T) {
-	s := beads.NewMemStore()
-	id, err := s.MolCook("deploy", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	b, err := s.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if b.Title != "deploy" {
-		t.Errorf("Title = %q, want %q (formula name as default)", b.Title, "deploy")
 	}
 }
 

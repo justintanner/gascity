@@ -133,14 +133,6 @@ type Store interface {
 	// or an error describing why the store is unavailable.
 	Ping() error
 
-	// MolCook instantiates an ephemeral molecule (wisp) from a formula
-	// and returns the root bead ID.
-	MolCook(formula, title string, vars []string) (string, error)
-
-	// MolCookOn instantiates an ephemeral molecule from a formula attached
-	// to an existing bead, and returns the wisp root bead ID.
-	MolCookOn(formula, beadID, title string, vars []string) (string, error)
-
 	// DepAdd records a dependency: issueID depends on (is blocked by)
 	// dependsOnID. The depType describes the relationship ("blocks",
 	// "tracks", "relates-to", etc.).

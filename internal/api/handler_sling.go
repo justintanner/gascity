@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/gastownhall/gascity/internal/molecule"
 	"github.com/gastownhall/gascity/internal/runtime"
 	"github.com/gastownhall/gascity/internal/telemetry"
 )
@@ -69,11 +70,14 @@ func (s *Server) handleSling(w http.ResponseWriter, r *http.Request) {
 	// exists unassigned. Acceptable for v0 single-process server; true atomicity
 	// requires transactional store operations (future work).
 	if body.Formula != "" {
-		rootID, err := store.MolCook(body.Formula, body.Formula, nil)
+		cookResult, err := molecule.Cook(r.Context(), store, body.Formula, nil, molecule.Options{
+			Title: body.Formula,
+		})
 		if err != nil {
 			writeStoreError(w, err)
 			return
 		}
+		rootID := cookResult.RootID
 		// Assign root bead to target agent (matching bead path semantics).
 		assignee := body.Target
 		if err := store.Update(rootID, beads.UpdateOpts{Assignee: &assignee}); err != nil {

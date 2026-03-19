@@ -13,6 +13,7 @@ import (
 	"github.com/gastownhall/gascity/internal/citylayout"
 	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/events"
+	"github.com/gastownhall/gascity/internal/molecule"
 	"github.com/gastownhall/gascity/internal/orders"
 )
 
@@ -233,7 +234,11 @@ func (m *memoryOrderDispatcher) dispatchWisp(ctx context.Context, a orders.Order
 		headSeq, _ = m.ep.LatestSeq()
 	}
 
-	rootID, err := m.store.MolCook(a.Formula, "", nil)
+	var searchPaths []string
+	if a.FormulaLayer != "" {
+		searchPaths = []string{a.FormulaLayer}
+	}
+	cookResult, err := molecule.Cook(ctx, m.store, a.Formula, searchPaths, molecule.Options{})
 	if err != nil {
 		m.rec.Record(events.Event{
 			Type:    events.OrderFailed,
@@ -243,6 +248,7 @@ func (m *memoryOrderDispatcher) dispatchWisp(ctx context.Context, a orders.Order
 		})
 		return // best-effort: skip failed cook, don't crash
 	}
+	rootID := cookResult.RootID
 
 	// Label wisp with order-run:<scopedName> for tracking.
 	args := []string{"update", rootID, "--add-label=order-run:" + scoped}

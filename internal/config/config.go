@@ -130,6 +130,18 @@ type FormulaLayers struct {
 	Rigs map[string][]string
 }
 
+// SearchPaths returns the ordered formula search directories for a rig.
+// Falls back to city-level layers if no rig-specific layers exist.
+// Returns nil if no formula layers are configured.
+func (fl FormulaLayers) SearchPaths(rigName string) []string {
+	if rigName != "" {
+		if paths, ok := fl.Rigs[rigName]; ok && len(paths) > 0 {
+			return paths
+		}
+	}
+	return fl.City
+}
+
 // Rig defines an external project registered in the city.
 type Rig struct {
 	// Name is the unique identifier for this rig.

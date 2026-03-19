@@ -44,6 +44,7 @@ func setupConvergenceRuntime(t *testing.T) (*CityRuntime, *beads.MemStore) {
 
 	// Initialize convergence handler (mimics initConvergenceHandler).
 	adapter := newConvergenceStoreAdapter(store)
+	adapter.formulaSearchPaths = []string{sharedTestFormulaDir}
 	emitter := &convergenceEventEmitter{rec: cr.rec}
 	cr.convStoreAdapter = adapter
 	cr.convHandler = &convergence.Handler{

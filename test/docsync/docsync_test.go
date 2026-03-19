@@ -447,7 +447,6 @@ func TestNoKnownStaleDocReferences(t *testing.T) {
 	banned := []string{
 		"internal/session/session.go",
 		"internal/session/fingerprint.go",
-		"internal/formula/",
 		"docs/primitive-test.md",
 		"02-named-crew.md",
 		"04-agent-team.md",
