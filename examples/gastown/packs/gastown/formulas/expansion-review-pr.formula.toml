@@ -40,6 +40,18 @@ version = 2
 description = "Skip Gemini reviewer (dual-model mode)"
 default = "false"
 
+[vars.reviewer_claude]
+description = "Agent name for the Claude reviewer step"
+default = "polecat"
+
+[vars.reviewer_codex]
+description = "Agent name for the Codex reviewer step"
+default = "polecat"
+
+[vars.reviewer_gemini]
+description = "Agent name for the Gemini reviewer step"
+default = "polecat"
+
 [vars.review_context]
 description = "Path to the review context file (metadata + diff)"
 default = ""
@@ -49,7 +61,7 @@ default = ""
 [[template]]
 id = "{target}.review-claude"
 title = "Code review: Claude (reasoning-heavy)"
-assignee = "polecat"
+assignee = "{reviewer_claude}"
 metadata = { "gc.continuation_group" = "review-fan" }
 description = """
 Claude reviews from the BASE worktree (pre-change state). The diff is
@@ -143,7 +155,7 @@ End with:
 [[template]]
 id = "{target}.review-codex"
 title = "Code review: Codex (evidence-first)"
-assignee = "polecat"
+assignee = "{reviewer_codex}"
 metadata = { "gc.continuation_group" = "review-fan" }
 description = """
 Codex reviews from the PR HEAD worktree (post-change state). The diff is
@@ -232,7 +244,7 @@ End with:
 [[template]]
 id = "{target}.review-gemini"
 title = "Code review: Gemini (cross-file consistency)"
-assignee = "polecat"
+assignee = "{reviewer_gemini}"
 condition = "!{{skip_gemini}}"
 metadata = { "gc.continuation_group" = "review-fan" }
 description = """
