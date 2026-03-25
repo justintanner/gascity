@@ -3,6 +3,7 @@ package formula
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 // Compile loads a formula by name and runs the full compilation pipeline.
@@ -388,6 +389,9 @@ func isGraphWorkflow(f *Formula) bool {
 		return false
 	}
 	if !GraphWorkflowsEnabled {
+		if f.Version >= 2 {
+			log.Printf("formula declares version %d but graph_workflows is disabled; compiling as v1", f.Version)
+		}
 		return false
 	}
 	if f.Version >= 2 {

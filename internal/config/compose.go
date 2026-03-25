@@ -7,9 +7,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/gastownhall/gascity/internal/citylayout"
-	"github.com/gastownhall/gascity/internal/formula"
 	"github.com/gastownhall/gascity/internal/fsys"
-	"github.com/gastownhall/gascity/internal/molecule"
 )
 
 // Provenance tracks where each configuration element originated during
@@ -167,12 +165,6 @@ func LoadWithIncludes(fs fsys.FS, path string, extraIncludes ...string) (*City, 
 		cityTopoFormulas, cityLocalFormulas, rigFormulaDirs, root.Rigs, cityRoot)
 	root.ScriptLayers = ComputeScriptLayers(
 		root.PackScriptDirs, root.RigScriptDirs, root.Rigs)
-
-	// Propagate the graph_workflows feature flag to formula and molecule
-	// packages before injecting implicit agents (which gates the
-	// workflow-control agent on this flag).
-	formula.GraphWorkflowsEnabled = root.Daemon.GraphWorkflows
-	molecule.GraphApplyEnabled = root.Daemon.GraphWorkflows
 
 	// Inject implicit agents for built-in providers not already defined.
 	// Must happen after all composition (fragments, packs, patches) so

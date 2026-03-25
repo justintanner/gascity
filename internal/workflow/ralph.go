@@ -11,6 +11,7 @@ import (
 
 	"github.com/gastownhall/gascity/internal/beads"
 	"github.com/gastownhall/gascity/internal/convergence"
+	"github.com/gastownhall/gascity/internal/molecule"
 )
 
 func processRalphCheck(store beads.Store, bead beads.Bead, opts ProcessOptions) (ControlResult, error) {
@@ -232,8 +233,10 @@ func appendRalphRetry(store beads.Store, logicalID string, prevSubject, prevChec
 		}
 		return existing, nil
 	}
-	if applier, ok := store.(beads.GraphApplyStore); ok {
-		return appendRalphRetryViaGraphApply(store, applier, logicalID, prevSubject, prevCheck, attemptSet, oldAttempt, nextAttempt, oldScopeRef, newScopeRef)
+	if molecule.GraphApplyEnabled {
+		if applier, ok := store.(beads.GraphApplyStore); ok {
+			return appendRalphRetryViaGraphApply(store, applier, logicalID, prevSubject, prevCheck, attemptSet, oldAttempt, nextAttempt, oldScopeRef, newScopeRef)
+		}
 	}
 	return appendRalphRetryLegacy(store, logicalID, prevSubject, prevCheck, attemptSet, oldAttempt, nextAttempt, oldScopeRef, newScopeRef)
 }

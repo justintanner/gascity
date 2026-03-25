@@ -277,6 +277,7 @@ func tryReloadConfig(tomlPath, lockedCityName, cityRoot string, stderr io.Writer
 	if err != nil {
 		return nil, fmt.Errorf("parsing city.toml: %w", err)
 	}
+	applyFeatureFlags(newCfg)
 	if strictMode && len(prov.Warnings) > 0 {
 		for _, w := range prov.Warnings {
 			fmt.Fprintf(stderr, "gc start: strict: %s\n", w) //nolint:errcheck // best-effort stderr

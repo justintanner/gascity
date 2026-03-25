@@ -249,6 +249,7 @@ func cmdSling(args []string, isFormula, doNudge, force bool, title string, vars 
 		fmt.Fprintf(stderr, "gc sling: %v\n", err) //nolint:errcheck // best-effort stderr
 		return 1
 	}
+	applyFeatureFlags(cfg)
 
 	var target, beadOrFormula string
 	switch {

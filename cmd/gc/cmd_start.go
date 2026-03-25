@@ -346,6 +346,7 @@ func doStartStandalone(args []string, controllerMode bool, stdout, stderr io.Wri
 		fmt.Fprintln(stderr, "hint: run \"gc doctor\" for diagnostics") //nolint:errcheck // best-effort stderr
 		return 1
 	}
+	applyFeatureFlags(cfg)
 	// Strict mode (default) promotes composition warnings to errors.
 	if strictMode && len(prov.Warnings) > 0 {
 		for _, w := range prov.Warnings {
