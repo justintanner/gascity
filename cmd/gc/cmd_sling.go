@@ -1055,12 +1055,12 @@ func instantiateSlingFormula(ctx context.Context, formulaName string, searchPath
 	}
 	slingTracef("instantiate compiled formula=%s dur=%s steps=%d", formulaName, time.Since(compileStart), len(recipe.Steps))
 	if isCompiledGraphWorkflow(recipe) {
-		if a.IsPool() {
-			return nil, fmt.Errorf("graph.v2 workflows currently require a fixed-agent target")
-		}
-		sessionName := lookupSessionNameOrLegacy(deps.Store, deps.CityName, a.QualifiedName(), deps.Cfg.Workspace.SessionTemplate)
-		if sessionName == "" {
-			return nil, fmt.Errorf("could not resolve session name for %q", a.QualifiedName())
+		var sessionName string
+		if !a.IsPool() {
+			sessionName = lookupSessionNameOrLegacy(deps.Store, deps.CityName, a.QualifiedName(), deps.Cfg.Workspace.SessionTemplate)
+			if sessionName == "" {
+				return nil, fmt.Errorf("could not resolve session name for %q", a.QualifiedName())
+			}
 		}
 		if err := decorateGraphWorkflowRecipe(recipe, sourceBeadID, scopeKind, scopeRef, deps.StoreRef, a.QualifiedName(), sessionName, deps.Store, deps.CityName, deps.Cfg); err != nil {
 			slingTracef("instantiate decorate-error formula=%s err=%v", formulaName, err)
@@ -1089,9 +1089,11 @@ func decorateGraphWorkflowRecipe(recipe *formula.Recipe, sourceBeadID, scopeKind
 	if recipe == nil {
 		return fmt.Errorf("workflow recipe is nil")
 	}
-	defaultRoute := graphRouteBinding{
-		qualifiedName: routedTo,
-		sessionName:   sessionName,
+	defaultRoute := graphRouteBinding{qualifiedName: routedTo}
+	if sessionName != "" {
+		defaultRoute.sessionName = sessionName
+	} else {
+		defaultRoute.label = "pool:" + routedTo
 	}
 	controlRoute, err := workflowControlBinding(store, cityName, cfg)
 	if err != nil {
