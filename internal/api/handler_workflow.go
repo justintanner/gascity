@@ -1171,6 +1171,7 @@ func (s *Server) workflowSessionIndex() map[string]workflowSessionRef {
 			continue
 		}
 		addWorkflowSessionRef(index, sessionName, bead)
+		addWorkflowSessionRef(index, bead.ID, bead)
 		addWorkflowSessionRef(index, bead.Metadata["agent_name"], bead)
 		addWorkflowSessionRef(index, bead.Metadata["alias"], bead)
 	}
