@@ -1004,6 +1004,99 @@ func TestWorkflowStatusTreatsSkippedAsSkipped(t *testing.T) {
 	}
 }
 
+func TestLogicalStatusPrefersTerminalBaseOverCurrent(t *testing.T) {
+	t.Parallel()
+
+	base := beads.Bead{
+		ID:     "logical",
+		Status: "closed",
+		Metadata: map[string]string{
+			"gc.outcome": "fail",
+		},
+	}
+	current := beads.Bead{
+		ID:       "attempt",
+		Status:   "in_progress",
+		Assignee: "mayor",
+	}
+
+	if got := logicalStatus(base, current); got != "failed" {
+		t.Fatalf("logicalStatus(base failed, current active) = %q, want failed", got)
+	}
+}
+
+func TestLogicalCurrentBeadPrefersTerminalBaseOverLeakedAttempt(t *testing.T) {
+	t.Parallel()
+
+	base := beads.Bead{
+		ID:     "logical",
+		Status: "closed",
+		Metadata: map[string]string{
+			"gc.outcome": "skipped",
+		},
+	}
+	leaked := beads.Bead{
+		ID:       "attempt",
+		Status:   "in_progress",
+		Assignee: "mayor",
+		Metadata: map[string]string{
+			"gc.attempt": "1",
+		},
+	}
+	group := &logicalGroup{
+		id:      base.ID,
+		base:    &base,
+		members: []beads.Bead{base, leaked},
+	}
+
+	if got := logicalCurrentBead(group, base); got.ID != base.ID {
+		t.Fatalf("logicalCurrentBead(...).ID = %q, want %q", got.ID, base.ID)
+	}
+}
+
+func TestBuildLogicalAttemptsPrefersTerminalBaseOutcome(t *testing.T) {
+	t.Parallel()
+
+	base := beads.Bead{
+		ID:     "logical",
+		Status: "closed",
+		Metadata: map[string]string{
+			"gc.outcome":      "fail",
+			"gc.max_attempts": "3",
+		},
+	}
+	attempt := beads.Bead{
+		ID:     "attempt-1",
+		Status: "closed",
+		Metadata: map[string]string{
+			"gc.attempt":      "1",
+			"gc.max_attempts": "3",
+		},
+	}
+	group := &logicalGroup{
+		id:      base.ID,
+		base:    &base,
+		members: []beads.Bead{base, attempt},
+	}
+
+	attempts, attemptCount, activeAttempt, attemptBadge := buildLogicalAttempts(group, base)
+	if attemptCount != 1 {
+		t.Fatalf("attemptCount = %d, want 1", attemptCount)
+	}
+	if activeAttempt != 0 {
+		t.Fatalf("activeAttempt = %d, want 0 for terminal logical bead", activeAttempt)
+	}
+	if attemptBadge != "1/3" {
+		t.Fatalf("attemptBadge = %q, want 1/3", attemptBadge)
+	}
+	if len(attempts) != 1 {
+		t.Fatalf("attempts len = %d, want 1", len(attempts))
+	}
+	if attempts[0].Status != "failed" {
+		t.Fatalf("attempts[0].Status = %q, want failed", attempts[0].Status)
+	}
+}
+
 func TestWorkflowGetRejectsNonWorkflowRoot(t *testing.T) {
 	state := newFakeState(t)
 	cityStore := beads.NewMemStore()

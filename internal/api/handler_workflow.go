@@ -535,7 +535,7 @@ func buildLogicalNodes(root beads.Bead, workflowBeads []beads.Bead, groups map[s
 		base := logicalBaseBead(group)
 		current := logicalCurrentBead(group, base)
 		scopeRef := logicalScopeRef(workflowBeads, root.ID, base, current)
-		attempts, attemptCount, activeAttempt, attemptBadge := buildLogicalAttempts(group)
+		attempts, attemptCount, activeAttempt, attemptBadge := buildLogicalAttempts(group, base)
 		metaSource := current
 		if base.ID != "" {
 			metaSource = base
@@ -568,7 +568,7 @@ func buildLogicalNodes(root beads.Bead, workflowBeads []beads.Bead, groups map[s
 	return nodes
 }
 
-func buildLogicalAttempts(group *logicalGroup) ([]logicalAttemptResponse, int, int, string) {
+func buildLogicalAttempts(group *logicalGroup, base beads.Bead) ([]logicalAttemptResponse, int, int, string) {
 	attemptBeads := make(map[int][]beads.Bead)
 	maxAttempts := 0
 	for _, bead := range group.members {
@@ -590,14 +590,21 @@ func buildLogicalAttempts(group *logicalGroup) ([]logicalAttemptResponse, int, i
 	sort.Ints(attemptNums)
 
 	attempts := make([]logicalAttemptResponse, 0, len(attemptNums))
+	baseStatus := workflowStatus(base)
+	baseTerminal := isTerminalWorkflowStatus(baseStatus)
 	activeAttempt := 0
-	for _, attempt := range attemptNums {
+	displayAttempt := 0
+	for idx, attempt := range attemptNums {
 		beadsForAttempt := attemptBeads[attempt]
 		primary := preferredAttemptBead(beadsForAttempt)
 		status := aggregateAttemptStatus(beadsForAttempt)
-		if status == "active" || status == "pending" {
+		if baseTerminal && idx == len(attemptNums)-1 {
+			status = baseStatus
+		}
+		if !baseTerminal && (status == "active" || status == "pending") {
 			activeAttempt = attempt
 		}
+		displayAttempt = attempt
 
 		summary := map[string]any{
 			"bead_ids": attemptBeadIDs(beadsForAttempt),
@@ -615,16 +622,13 @@ func buildLogicalAttempts(group *logicalGroup) ([]logicalAttemptResponse, int, i
 		attempts = append(attempts, entry)
 	}
 
-	if activeAttempt == 0 {
-		activeAttempt = attemptNums[len(attemptNums)-1]
-	}
-	if activeAttempt == 0 {
+	if displayAttempt == 0 {
 		return attempts, len(attemptNums), 0, ""
 	}
 	if maxAttempts > 0 {
-		return attempts, len(attemptNums), activeAttempt, strconv.Itoa(activeAttempt) + "/" + strconv.Itoa(maxAttempts)
+		return attempts, len(attemptNums), activeAttempt, strconv.Itoa(displayAttempt) + "/" + strconv.Itoa(maxAttempts)
 	}
-	return attempts, len(attemptNums), activeAttempt, strconv.Itoa(activeAttempt)
+	return attempts, len(attemptNums), activeAttempt, strconv.Itoa(displayAttempt)
 }
 
 func buildScopeGroups(nodes []logicalNodeResponse, workflowBeads []beads.Bead) []scopeGroupResponse {
@@ -680,6 +684,10 @@ func logicalBaseBead(group *logicalGroup) beads.Bead {
 }
 
 func logicalCurrentBead(group *logicalGroup, base beads.Bead) beads.Bead {
+	if isTerminalWorkflowStatus(workflowStatus(base)) {
+		return base
+	}
+
 	candidates := make([]beads.Bead, 0, len(group.members))
 	for _, bead := range group.members {
 		if bead.ID == base.ID {
@@ -771,6 +779,9 @@ func logicalScopeRef(workflowBeads []beads.Bead, rootID string, base, current be
 }
 
 func logicalStatus(base, current beads.Bead) string {
+	if status := workflowStatus(base); isTerminalWorkflowStatus(status) {
+		return status
+	}
 	if status := workflowStatus(current); status != "" {
 		return status
 	}
@@ -805,6 +816,15 @@ func statusRank(status string) int {
 		return 1
 	default:
 		return 0
+	}
+}
+
+func isTerminalWorkflowStatus(status string) bool {
+	switch status {
+	case "completed", "skipped", "failed":
+		return true
+	default:
+		return false
 	}
 }
 
