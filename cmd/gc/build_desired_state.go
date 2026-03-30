@@ -145,6 +145,10 @@ func buildDesiredStateWithSessionBeads(
 
 		sp := scaleParamsFor(&cfg.Agents[i])
 
+		if cfg.Agents[i].Name == "workflow-control" {
+			fmt.Fprintf(stderr, "DEBUG agent-loop %q: sp.Max=%d sp.Min=%d\n", cfg.Agents[i].QualifiedName(), sp.Max, sp.Min) //nolint:errcheck
+		}
+
 		if sp.Max == 0 {
 			continue
 		}

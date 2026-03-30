@@ -14,11 +14,12 @@ import (
 
 // CityInfo describes a managed city for the /v0/cities endpoint.
 type CityInfo struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	Running bool   `json:"running"`
-	Status  string `json:"status,omitempty"`
-	Error   string `json:"error,omitempty"`
+	Name            string   `json:"name"`
+	Path            string   `json:"path"`
+	Running         bool     `json:"running"`
+	Status          string   `json:"status,omitempty"`
+	Error           string   `json:"error,omitempty"`
+	PhasesCompleted []string `json:"phases_completed,omitempty"`
 }
 
 // CityResolver provides city lookup for the supervisor API router.
@@ -346,16 +347,48 @@ func (sm *SupervisorMux) buildMultiplexer() *events.Multiplexer {
 func (sm *SupervisorMux) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	cities := sm.resolver.ListCities()
 	var running int
+	// Use the first city for startup info (single-city deployments).
+	var startup map[string]any
 	for _, c := range cities {
 		if c.Running {
 			running++
 		}
+		if startup == nil {
+			if c.Running {
+				startup = map[string]any{
+					"ready":            true,
+					"phase":            "running",
+					"phases_completed": allStartupPhases(),
+				}
+			} else {
+				startup = map[string]any{
+					"ready":            false,
+					"phase":            c.Status,
+					"phases_completed": c.PhasesCompleted,
+				}
+			}
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"status":         "ok",
 		"version":        sm.version,
 		"uptime_sec":     int(time.Since(sm.startedAt).Seconds()),
 		"cities_total":   len(cities),
 		"cities_running": running,
-	})
+	}
+	if startup != nil {
+		resp["startup"] = startup
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// allStartupPhases returns the ordered list of all startup phases.
+func allStartupPhases() []string {
+	return []string{
+		"loading_config",
+		"starting_bead_store",
+		"resolving_formulas",
+		"adopting_sessions",
+		"starting_agents",
+	}
 }
