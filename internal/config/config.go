@@ -1523,12 +1523,14 @@ func newWorkflowControlAgent(dir string) Agent {
 	if dir != "" {
 		qualifiedName = dir + "/" + WorkflowControlAgentName
 	}
+	one := 1
 	a := Agent{
-		Name:         WorkflowControlAgentName,
-		Dir:          dir,
-		Description:  "Built-in deterministic graph.v2 workflow control worker",
-		StartCommand: WorkflowControlStartCommandFor(qualifiedName),
-		Implicit:     true,
+		Name:              WorkflowControlAgentName,
+		Dir:               dir,
+		Description:       "Built-in deterministic graph.v2 workflow control worker",
+		StartCommand:      WorkflowControlStartCommandFor(qualifiedName),
+		MaxActiveSessions: &one,
+		Implicit:          true,
 	}
 	return a
 }
