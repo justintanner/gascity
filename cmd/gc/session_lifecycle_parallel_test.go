@@ -1570,7 +1570,7 @@ func (p *dieAfterStartProvider) Start(ctx context.Context, name string, cfg runt
 		return err
 	}
 	// Simulate the pane dying immediately.
-	_ = p.Fake.Stop(name)
+	_ = p.Stop(name)
 	return nil
 }
 
