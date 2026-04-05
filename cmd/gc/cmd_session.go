@@ -376,13 +376,7 @@ func cmdSessionList(stateFilter, templateFilter string, jsonOutput bool, stdout,
 
 	// Build attachment cache from Attached already populated by ListFull,
 	// avoiding redundant tmux subprocess calls in wakeReasons.
-	attachedSet := make(map[string]bool)
-	for _, s := range sessions {
-		name := s.SessionName
-		if name != "" {
-			attachedSet[name] = s.Attached
-		}
-	}
+	attachedSet := buildAttachmentCache(sessions)
 
 	if len(sessions) == 0 {
 		fmt.Fprintln(stdout, "No sessions found.") //nolint:errcheck // best-effort stdout
@@ -432,6 +426,19 @@ func (p *attachmentCachingProvider) IsAttached(name string) bool {
 		return v
 	}
 	return p.Provider.IsAttached(name)
+}
+
+func buildAttachmentCache(sessions []session.Info) map[string]bool {
+	cache := make(map[string]bool)
+	for _, s := range sessions {
+		// ListFull only populates Attached for active sessions. Leave other
+		// states uncached so reason evaluation can fall through to the provider.
+		if s.State != session.StateActive || s.SessionName == "" {
+			continue
+		}
+		cache[s.SessionName] = s.Attached
+	}
+	return cache
 }
 
 // sessionReason computes the REASON column for a session in gc session list.

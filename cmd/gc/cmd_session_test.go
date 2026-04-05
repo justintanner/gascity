@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"net"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gastownhall/gascity/internal/beads"
 	"github.com/gastownhall/gascity/internal/config"
+	"github.com/gastownhall/gascity/internal/runtime"
 	"github.com/gastownhall/gascity/internal/session"
 )
 
@@ -154,6 +156,72 @@ func TestShouldAttachNewSession(t *testing.T) {
 				t.Fatalf("shouldAttachNewSession(%v, %q) = %v, want %v", tt.noAttach, tt.transport, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildAttachmentCache_OnlyCachesKnownActiveSessions(t *testing.T) {
+	cache := buildAttachmentCache([]session.Info{
+		{SessionName: "active-attached", State: session.StateActive, Attached: true},
+		{SessionName: "active-detached", State: session.StateActive, Attached: false},
+		{SessionName: "sleeping", State: session.StateAsleep, Attached: false},
+		{SessionName: "suspended", State: session.StateSuspended, Attached: false},
+		{State: session.StateActive, Attached: true},
+	})
+
+	if len(cache) != 2 {
+		t.Fatalf("cache entries = %d, want 2", len(cache))
+	}
+	if got, ok := cache["active-attached"]; !ok || !got {
+		t.Fatalf("cache[active-attached] = (%v, %v), want (true, true)", got, ok)
+	}
+	if got, ok := cache["active-detached"]; !ok || got {
+		t.Fatalf("cache[active-detached] = (%v, %v), want (false, true)", got, ok)
+	}
+	if _, ok := cache["sleeping"]; ok {
+		t.Fatal("sleeping session should not be cached")
+	}
+	if _, ok := cache["suspended"]; ok {
+		t.Fatal("suspended session should not be cached")
+	}
+}
+
+func TestSessionReason_FallsThroughToProviderForSleepingAttachment(t *testing.T) {
+	sp := runtime.NewFake()
+	_ = sp.Start(context.Background(), "sleeping-worker", runtime.Config{})
+	sp.SetAttached("sleeping-worker", true)
+
+	cfg := &config.City{}
+	bead := beads.Bead{
+		ID:     "gc-1",
+		Status: "open",
+		Metadata: map[string]string{
+			"template":     "worker",
+			"session_name": "sleeping-worker",
+			"state":        "asleep",
+			"sleep_reason": "idle-timeout",
+		},
+	}
+	info := session.Info{
+		ID:          "gc-1",
+		Template:    "worker",
+		State:       session.StateAsleep,
+		SessionName: "sleeping-worker",
+		Attached:    false,
+	}
+
+	reason := sessionReason(
+		info,
+		map[string]beads.Bead{bead.ID: bead},
+		cfg,
+		&attachmentCachingProvider{
+			Provider: sp,
+			cache:    buildAttachmentCache([]session.Info{info}),
+		},
+		nil,
+		nil,
+	)
+	if reason != string(WakeAttached) {
+		t.Fatalf("sessionReason = %q, want %q", reason, WakeAttached)
 	}
 }
 
