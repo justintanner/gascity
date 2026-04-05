@@ -1,12 +1,49 @@
 package hooks
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/fsys"
 )
+
+func claudeHookCommand(t *testing.T, data []byte, event string) string {
+	t.Helper()
+	var cfg struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unmarshal claude hooks: %v", err)
+	}
+	entries := cfg.Hooks[event]
+	if len(entries) == 0 || len(entries[0].Hooks) == 0 {
+		t.Fatalf("missing claude hook for %s", event)
+	}
+	return entries[0].Hooks[0].Command
+}
+
+func cursorHookCommand(t *testing.T, data []byte, event string) string {
+	t.Helper()
+	var cfg struct {
+		Hooks map[string][]struct {
+			Command string `json:"command"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unmarshal cursor hooks: %v", err)
+	}
+	entries := cfg.Hooks[event]
+	if len(entries) == 0 {
+		t.Fatalf("missing cursor hook for %s", event)
+	}
+	return entries[0].Command
+}
 
 func TestSupportedProviders(t *testing.T) {
 	got := SupportedProviders()
@@ -70,13 +107,10 @@ func TestInstallClaude(t *testing.T) {
 	if string(runtimeData) != string(data) {
 		t.Error("runtime Claude settings should mirror hooks/claude.json")
 	}
-	if !strings.Contains(s, "gc prime") {
-		t.Error("claude settings should contain gc prime (for SessionStart)")
+	if !strings.Contains(claudeHookCommand(t, data, "SessionStart"), "gc prime --hook") {
+		t.Error("claude SessionStart hook should contain gc prime --hook")
 	}
-	// PreCompact should use gc handoff, not gc prime. SessionStart already handles
-	// the resume case; re-injecting the full context block on compaction too causes
-	// context accumulation in long sessions.
-	if !strings.Contains(s, `gc handoff`) {
+	if !strings.Contains(claudeHookCommand(t, data, "PreCompact"), `gc handoff "context cycle"`) {
 		t.Error("claude PreCompact hook should use gc handoff (not gc prime) to avoid context accumulation on compaction")
 	}
 	if !strings.Contains(s, "gc nudge drain --inject") {
@@ -90,6 +124,30 @@ func TestInstallClaude(t *testing.T) {
 	}
 	if !strings.Contains(s, `$HOME/go/bin`) {
 		t.Error("claude hook commands should include PATH export")
+	}
+}
+
+func TestInstallClaudeUpgradesStaleGeneratedFile(t *testing.T) {
+	fs := fsys.NewFake()
+	current, err := readEmbedded("config/claude.json")
+	if err != nil {
+		t.Fatalf("readEmbedded: %v", err)
+	}
+	stale := strings.Replace(string(current), `gc handoff "context cycle"`, `gc prime --hook`, 1)
+	fs.Files["/city/hooks/claude.json"] = []byte(stale)
+	fs.Files["/city/.gc/settings.json"] = []byte(stale)
+
+	if err := Install(fs, "/city", "/work", []string{"claude"}); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+
+	hookData := fs.Files["/city/hooks/claude.json"]
+	runtimeData := fs.Files["/city/.gc/settings.json"]
+	if !strings.Contains(claudeHookCommand(t, hookData, "PreCompact"), `gc handoff "context cycle"`) {
+		t.Fatalf("upgraded claude hook missing gc handoff:\n%s", string(hookData))
+	}
+	if string(runtimeData) != string(hookData) {
+		t.Fatalf("runtime Claude settings should mirror upgraded hook settings:\n%s", string(runtimeData))
 	}
 }
 
@@ -305,14 +363,51 @@ func TestInstallCursor(t *testing.T) {
 	if !strings.Contains(string(data), "sessionStart") {
 		t.Error("cursor hooks should contain sessionStart")
 	}
-	if !strings.Contains(string(data), "gc prime --hook") {
-		t.Error("cursor hooks should contain gc prime --hook")
+	if !strings.Contains(cursorHookCommand(t, data, "sessionStart"), "gc prime --hook") {
+		t.Error("cursor sessionStart hook should contain gc prime --hook")
+	}
+	if !strings.Contains(cursorHookCommand(t, data, "preCompact"), `gc handoff "context cycle"`) {
+		t.Error("cursor preCompact hook should contain gc handoff \"context cycle\"")
 	}
 	if !strings.Contains(string(data), "gc mail check --inject") {
 		t.Error("cursor hooks should contain gc mail check --inject")
 	}
 	if !strings.Contains(string(data), "gc nudge drain --inject") {
 		t.Error("cursor hooks should contain gc nudge drain --inject")
+	}
+}
+
+func TestInstallCursorUpgradesStaleGeneratedFile(t *testing.T) {
+	fs := fsys.NewFake()
+	current, err := readEmbedded("config/cursor.json")
+	if err != nil {
+		t.Fatalf("readEmbedded: %v", err)
+	}
+	stale := strings.Replace(string(current), `gc handoff "context cycle"`, `gc prime --hook`, 1)
+	fs.Files["/work/.cursor/hooks.json"] = []byte(stale)
+
+	if err := Install(fs, "/city", "/work", []string{"cursor"}); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+
+	got := fs.Files["/work/.cursor/hooks.json"]
+	if !strings.Contains(cursorHookCommand(t, got, "preCompact"), `gc handoff "context cycle"`) {
+		t.Fatalf("upgraded cursor hooks missing gc handoff:\n%s", string(got))
+	}
+}
+
+func TestInstallCursorPreservesExistingCustomFile(t *testing.T) {
+	fs := fsys.NewFake()
+	custom := `{"version":1,"hooks":{"sessionStart":[{"command":"custom-start"}],"preCompact":[{"command":"custom-compact"}]}}`
+	fs.Files["/work/.cursor/hooks.json"] = []byte(custom)
+
+	if err := Install(fs, "/city", "/work", []string{"cursor"}); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+
+	got := string(fs.Files["/work/.cursor/hooks.json"])
+	if got != custom {
+		t.Errorf("Install overwrote custom cursor hooks: got %q want %q", got, custom)
 	}
 }
 
