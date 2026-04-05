@@ -151,6 +151,7 @@ func TestWorkQueryHasReadyWorkNonEmptyJSONArray(t *testing.T) {
 }
 
 func TestCmdHookUsesAgentCityAndRigRoot(t *testing.T) {
+	t.Setenv("GC_TMUX_SESSION", "host-session")
 	clearGCEnv(t)
 	cityDir := t.TempDir()
 	rigDir := filepath.Join(cityDir, "myrig-repo")
@@ -221,6 +222,7 @@ max = 5
 }
 
 func TestCmdHookPoolInstanceUsesTemplatePoolLabel(t *testing.T) {
+	t.Setenv("GC_TMUX_SESSION", "host-session")
 	clearGCEnv(t)
 	cityDir := t.TempDir()
 	rigDir := filepath.Join(cityDir, "myrig-repo")
@@ -292,6 +294,7 @@ max = 5
 }
 
 func TestCmdHookExportsResolvedIdentityForFixedAgentQuery(t *testing.T) {
+	t.Setenv("GC_TMUX_SESSION", "host-session")
 	clearGCEnv(t)
 	cityDir := t.TempDir()
 	fakeBin := t.TempDir()
@@ -318,8 +321,6 @@ name = "worker"
 	origPath := os.Getenv("PATH")
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+origPath)
 	t.Setenv("GC_CITY", cityDir)
-	t.Setenv("GC_AGENT", "")
-	t.Setenv("GC_SESSION_NAME", "")
 
 	var stdout, stderr bytes.Buffer
 	code := cmdHook([]string{"worker"}, false, &stdout, &stderr)
@@ -340,6 +341,7 @@ name = "worker"
 }
 
 func TestCmdHookExportsResolvedIdentityFromRigContext(t *testing.T) {
+	t.Setenv("GC_TMUX_SESSION", "host-session")
 	clearGCEnv(t)
 	cityDir := t.TempDir()
 	rigDir := filepath.Join(cityDir, "myrig-repo")
@@ -376,8 +378,6 @@ dir = "myrig"
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+origPath)
 	t.Setenv("GC_CITY", cityDir)
 	t.Setenv("GC_DIR", rigDir)
-	t.Setenv("GC_AGENT", "")
-	t.Setenv("GC_SESSION_NAME", "")
 
 	wantAgent := "myrig/worker"
 	wantSession := cliSessionName(cityDir, "test-city", wantAgent, "")
