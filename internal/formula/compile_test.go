@@ -55,6 +55,9 @@ needs = ["dry", "wet"]
 	if recipe.Steps[0].ID != "pancakes" {
 		t.Errorf("root ID = %q, want %q", recipe.Steps[0].ID, "pancakes")
 	}
+	if recipe.RootStep().Type != "molecule" {
+		t.Errorf("root Type = %q, want %q", recipe.RootStep().Type, "molecule")
+	}
 
 	// Check step IDs are namespaced
 	if recipe.Steps[1].ID != "pancakes.dry" {
