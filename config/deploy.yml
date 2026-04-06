@@ -24,9 +24,12 @@ env:
   clear:
     GIT_USER: "jwt-gascity[bot]"
     GIT_EMAIL: "jwt-gascity[bot]@users.noreply.github.com"
+    GH_APP_ID: "3209605"
+    GH_APP_INSTALLATION_ID: "119659593"
     TERM: "xterm-256color"
   secret:
     - ANTHROPIC_API_KEY
+    - GH_APP_PEM
 
 builder:
   arch: amd64
