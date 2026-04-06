@@ -211,8 +211,58 @@ func TestInstallOpenCode(t *testing.T) {
 	if !ok {
 		t.Fatal("expected /work/.opencode/plugins/gascity.js to be written")
 	}
-	if !strings.Contains(string(data), "gc prime") {
+	s := string(data)
+	if !strings.Contains(s, "gc prime") {
 		t.Error("opencode plugin should contain gc prime")
+	}
+	if !strings.Contains(s, "export const server") {
+		t.Error("opencode plugin should use ESM server API")
+	}
+	if !strings.Contains(s, "output.system.push") {
+		t.Error("opencode plugin should inject prime via output.system.push")
+	}
+}
+
+func TestInstallOpenCodeUpgradesOldCommonJS(t *testing.T) {
+	fs := fsys.NewFake()
+	dst := "/work/.opencode/plugins/gascity.js"
+
+	// Write old CommonJS format.
+	oldPlugin := []byte(`const { execSync } = require("child_process");
+module.exports = { events: { "session.created": () => {} } };`)
+	fs.Files[dst] = oldPlugin
+
+	err := Install(fs, "/city", "/work", []string{"opencode"})
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	data, ok := fs.Files[dst]
+	if !ok {
+		t.Fatal("expected plugin file to exist after upgrade")
+	}
+	s := string(data)
+	if strings.Contains(s, "module.exports") {
+		t.Error("old CommonJS format should have been replaced")
+	}
+	if !strings.Contains(s, "export const server") {
+		t.Error("upgraded plugin should use ESM server API")
+	}
+}
+
+func TestInstallOpenCodePreservesCurrentESM(t *testing.T) {
+	fs := fsys.NewFake()
+	dst := "/work/.opencode/plugins/gascity.js"
+
+	// Write a current ESM plugin (no require/module.exports).
+	customPlugin := []byte(`export const server = async ({ $ }) => { /* custom */ };`)
+	fs.Files[dst] = customPlugin
+
+	err := Install(fs, "/city", "/work", []string{"opencode"})
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if string(fs.Files[dst]) != string(customPlugin) {
+		t.Error("existing ESM plugin should not be overwritten")
 	}
 }
 

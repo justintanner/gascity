@@ -1172,7 +1172,9 @@ func (t *Tmux) NudgeSession(session, message string) error {
 	// 3. Send Escape to exit vim INSERT mode if enabled (harmless in normal mode)
 	// See: https://github.com/anthropics/gastown/issues/307
 	_, _ = t.run("send-keys", "-t", target, "Escape")
-	time.Sleep(100 * time.Millisecond)
+	// 600ms exceeds bash readline's keyseq-timeout (500ms) so ESC is
+	// processed as a standalone keystroke, not as the start of M-Enter.
+	time.Sleep(600 * time.Millisecond)
 
 	// 4. Send Enter with retry (critical for message submission)
 	var lastErr error
@@ -1214,7 +1216,9 @@ func (t *Tmux) NudgePane(pane, message string) error {
 	// 3. Send Escape to exit vim INSERT mode if enabled (harmless in normal mode)
 	// See: https://github.com/anthropics/gastown/issues/307
 	_, _ = t.run("send-keys", "-t", pane, "Escape")
-	time.Sleep(100 * time.Millisecond)
+	// 600ms exceeds bash readline's keyseq-timeout (500ms) so ESC is
+	// processed as a standalone keystroke, not as the start of M-Enter.
+	time.Sleep(600 * time.Millisecond)
 
 	// 4. Send Enter with retry (critical for message submission)
 	var lastErr error

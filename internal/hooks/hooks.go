@@ -157,7 +157,11 @@ func installCodex(fs fsys.FS, workDir string) error {
 // installOpenCode writes .opencode/plugins/gascity.js in the working directory.
 func installOpenCode(fs fsys.FS, workDir string) error {
 	dst := filepath.Join(workDir, ".opencode", "plugins", "gascity.js")
-	return writeEmbedded(fs, "config/opencode.js", dst)
+	data, err := readEmbedded("config/opencode.js")
+	if err != nil {
+		return err
+	}
+	return writeEmbeddedManaged(fs, dst, data, openCodeFileNeedsUpgrade)
 }
 
 // installCopilot writes executable Copilot hooks plus a markdown companion file.
@@ -257,4 +261,12 @@ func matchesStaleManagedFile(existing []byte, embedPath string) bool {
 	}
 	stale := strings.Replace(string(current), `gc handoff "context cycle"`, `gc prime --hook`, 1)
 	return string(existing) == stale
+}
+
+func openCodeFileNeedsUpgrade(existing []byte) bool {
+	content := string(existing)
+	// Old CommonJS format uses require() and module.exports.
+	// New ESM format uses export const server.
+	return strings.Contains(content, "module.exports") ||
+		strings.Contains(content, "require(")
 }
