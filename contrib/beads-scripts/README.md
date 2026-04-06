@@ -87,13 +87,15 @@ provider = "exec:/path/to/contrib/beads-scripts/gc-beads-k8s"
 | `GC_K8S_IMAGE` | (required) | Container image (same as agent pods) |
 | `GC_K8S_DOLT_HOST` | `dolt.gc.svc.cluster.local` | Dolt service DNS |
 | `GC_K8S_DOLT_PORT` | `3307` | Dolt service port |
+| `GC_K8S_IMAGE_PULL_SECRET` | (none) | imagePullSecrets name (omitted if empty) |
+| `GC_K8S_CUSTOM_TYPES` | (none) | Custom bead types CSV for `bd config set types.custom` |
 
 **Lifecycle operations:**
 
 | Operation | Behavior |
 |-----------|----------|
-| `ensure-ready` | Create `gc-beads-runner` pod if not Running, wait for Ready, init `.beads/` |
-| `shutdown` | `kubectl delete pod gc-beads-runner` |
+| `ensure-ready` / `start` | Create `gc-beads-runner` pod if not Running, wait for Ready, init `.beads/` |
+| `shutdown` / `stop` | `kubectl delete pod gc-beads-runner` |
 
 **Other optional operations:**
 
