@@ -274,14 +274,10 @@ func TestDecorateDynamicFragmentRecipePreservesPoolFallbackAndScopeMetadata(t *t
 	if review.Metadata["gc.routed_to"] != "frontend/reviewer" {
 		t.Fatalf("review gc.routed_to = %q, want frontend/reviewer", review.Metadata["gc.routed_to"])
 	}
-	foundPoolLabel := false
 	for _, label := range review.Labels {
 		if label == "pool:frontend/reviewer" {
-			foundPoolLabel = true
+			t.Fatalf("review labels = %#v, should not contain legacy pool label", review.Labels)
 		}
-	}
-	if !foundPoolLabel {
-		t.Fatalf("review labels = %#v, want pool label", review.Labels)
 	}
 	if review.Metadata["gc.scope_ref"] != "body" {
 		t.Fatalf("review gc.scope_ref = %q, want body", review.Metadata["gc.scope_ref"])

@@ -1195,8 +1195,7 @@ type Agent struct {
 	// SlingQuery is the command template to route a bead to this agent/pool.
 	// Used by gc sling to make a bead visible to the target's work_query.
 	// The placeholder {} is replaced with the bead ID at runtime.
-	// Default for fixed agents: "bd update {} --assignee=<qualified-name>".
-	// Default for pool agents: "bd update {} --add-label=pool:<qualified-name>".
+	// Default for all agents: "bd update {} --set-metadata gc.routed_to=<qualified-name>".
 	// Pool agents must set both sling_query and work_query, or neither.
 	SlingQuery string `toml:"sling_query,omitempty"`
 	// IdleTimeout is the maximum time an agent session can be inactive before
@@ -1279,8 +1278,8 @@ type Agent struct {
 	// Runtime-only — not persisted to TOML or JSON.
 	SleepAfterIdleSource string `toml:"-" json:"-"`
 	// PoolName is the template agent's qualified name, set during pool
-	// expansion. Pool instances use this for label-based work discovery
-	// (e.g., pool:dog) rather than their instance name (e.g., pool:dog-1).
+	// expansion. Pool instances use this for gc.routed_to-based work discovery
+	// (e.g., dog) rather than their concrete instance name (e.g., dog-1).
 	PoolName string `toml:"-"`
 }
 

@@ -104,7 +104,7 @@ func processRalphCheck(store beads.Store, bead beads.Bead, opts ProcessOptions) 
 	}
 	if bead.Metadata["gc.retry_state"] != "spawned" {
 		tracef("ralph retry-append-start bead=%s next=%d", bead.ID, nextAttempt)
-		if _, err := appendRalphRetry(store, logicalID, subject, bead, nextAttempt); err != nil {
+		if _, err := appendRalphRetry(store, logicalID, subject, bead, nextAttempt, opts.CityPath); err != nil {
 			return ControlResult{}, fmt.Errorf("%s: appending retry: %w", bead.ID, err)
 		}
 		tracef("ralph retry-append-done bead=%s next=%d", bead.ID, nextAttempt)
@@ -198,7 +198,7 @@ func persistCheckResult(store beads.Store, beadID string, result convergence.Gat
 	return store.SetMetadataBatch(beadID, batch)
 }
 
-func appendRalphRetry(store beads.Store, logicalID string, prevSubject, prevCheck beads.Bead, nextAttempt int) (map[string]string, error) {
+func appendRalphRetry(store beads.Store, logicalID string, prevSubject, prevCheck beads.Bead, nextAttempt int, cityPath string) (map[string]string, error) {
 	var rootBeads []beads.Bead
 	rootID := prevSubject.Metadata["gc.root_bead_id"]
 	if rootID != "" {
@@ -235,13 +235,13 @@ func appendRalphRetry(store beads.Store, logicalID string, prevSubject, prevChec
 	}
 	if molecule.GraphApplyEnabled {
 		if applier, ok := store.(beads.GraphApplyStore); ok {
-			return appendRalphRetryViaGraphApply(store, applier, logicalID, prevSubject, prevCheck, attemptSet, oldAttempt, nextAttempt, oldScopeRef, newScopeRef)
+			return appendRalphRetryViaGraphApply(store, applier, logicalID, prevSubject, prevCheck, attemptSet, oldAttempt, nextAttempt, oldScopeRef, newScopeRef, cityPath)
 		}
 	}
-	return appendRalphRetryLegacy(store, logicalID, prevSubject, prevCheck, attemptSet, oldAttempt, nextAttempt, oldScopeRef, newScopeRef)
+	return appendRalphRetryLegacy(store, logicalID, prevSubject, prevCheck, attemptSet, oldAttempt, nextAttempt, oldScopeRef, newScopeRef, cityPath)
 }
 
-func appendRalphRetryLegacy(store beads.Store, logicalID string, prevSubject, prevCheck beads.Bead, attemptSet map[string]beads.Bead, oldAttempt, nextAttempt int, oldScopeRef, newScopeRef string) (map[string]string, error) {
+func appendRalphRetryLegacy(store beads.Store, logicalID string, prevSubject, prevCheck beads.Bead, attemptSet map[string]beads.Bead, oldAttempt, nextAttempt int, oldScopeRef, newScopeRef, cityPath string) (map[string]string, error) {
 	mapping := make(map[string]string, len(attemptSet)+1)
 	pendingAssignees := make(map[string]string, len(attemptSet)+1)
 
@@ -280,7 +280,7 @@ func appendRalphRetryLegacy(store beads.Store, logicalID string, prevSubject, pr
 		return nil, err
 	}
 	mapping[prevSubject.ID] = newSubject.ID
-	if preservedAssignee := retryPreservedAssignee(prevSubject); preservedAssignee != "" {
+	if preservedAssignee := retryPreservedAssignee(prevSubject, cityPath); preservedAssignee != "" {
 		pendingAssignees[prevSubject.ID] = preservedAssignee
 	}
 
@@ -313,7 +313,7 @@ func appendRalphRetryLegacy(store beads.Store, logicalID string, prevSubject, pr
 			return nil, err
 		}
 		mapping[old.ID] = created.ID
-		if preservedAssignee := retryPreservedAssignee(old); preservedAssignee != "" {
+		if preservedAssignee := retryPreservedAssignee(old, cityPath); preservedAssignee != "" {
 			pendingAssignees[old.ID] = preservedAssignee
 		}
 	}
@@ -342,7 +342,7 @@ func appendRalphRetryLegacy(store beads.Store, logicalID string, prevSubject, pr
 		return nil, err
 	}
 	mapping[prevCheck.ID] = newCheck.ID
-	if preservedAssignee := retryPreservedAssignee(prevCheck); preservedAssignee != "" {
+	if preservedAssignee := retryPreservedAssignee(prevCheck, cityPath); preservedAssignee != "" {
 		pendingAssignees[prevCheck.ID] = preservedAssignee
 	}
 
@@ -388,7 +388,7 @@ func appendRalphRetryLegacy(store beads.Store, logicalID string, prevSubject, pr
 	return mapping, nil
 }
 
-func appendRalphRetryViaGraphApply(store beads.Store, applier beads.GraphApplyStore, logicalID string, prevSubject, prevCheck beads.Bead, attemptSet map[string]beads.Bead, oldAttempt, nextAttempt int, oldScopeRef, newScopeRef string) (map[string]string, error) {
+func appendRalphRetryViaGraphApply(store beads.Store, applier beads.GraphApplyStore, logicalID string, prevSubject, prevCheck beads.Bead, attemptSet map[string]beads.Bead, oldAttempt, nextAttempt int, oldScopeRef, newScopeRef, cityPath string) (map[string]string, error) {
 	ordered := make([]beads.Bead, 0, len(attemptSet))
 	for _, bead := range attemptSet {
 		ordered = append(ordered, bead)
@@ -412,14 +412,14 @@ func appendRalphRetryViaGraphApply(store beads.Store, applier beads.GraphApplySt
 		Edges:         make([]beads.GraphApplyEdge, 0, len(attemptSet)*2),
 	}
 
-	plan.Nodes = append(plan.Nodes, buildRalphRetryGraphNode(prevSubject, logicalID, oldScopeRef, newScopeRef, oldAttempt, nextAttempt, attemptIDs))
+	plan.Nodes = append(plan.Nodes, buildRalphRetryGraphNode(prevSubject, logicalID, oldScopeRef, newScopeRef, oldAttempt, nextAttempt, attemptIDs, cityPath))
 	for _, old := range ordered {
 		if old.ID == prevSubject.ID {
 			continue
 		}
-		plan.Nodes = append(plan.Nodes, buildRalphRetryGraphNode(old, logicalID, oldScopeRef, newScopeRef, oldAttempt, nextAttempt, attemptIDs))
+		plan.Nodes = append(plan.Nodes, buildRalphRetryGraphNode(old, logicalID, oldScopeRef, newScopeRef, oldAttempt, nextAttempt, attemptIDs, cityPath))
 	}
-	plan.Nodes = append(plan.Nodes, buildRalphRetryGraphNode(prevCheck, logicalID, oldScopeRef, newScopeRef, oldAttempt, nextAttempt, attemptIDs))
+	plan.Nodes = append(plan.Nodes, buildRalphRetryGraphNode(prevCheck, logicalID, oldScopeRef, newScopeRef, oldAttempt, nextAttempt, attemptIDs, cityPath))
 
 	for _, old := range ordered {
 		if err := appendRalphRetryGraphEdges(plan, store, old.ID, attemptIDs); err != nil {
@@ -452,7 +452,7 @@ func appendRalphRetryViaGraphApply(store beads.Store, applier beads.GraphApplySt
 	return mapping, nil
 }
 
-func buildRalphRetryGraphNode(old beads.Bead, logicalID, oldScopeRef, newScopeRef string, oldAttempt, nextAttempt int, attemptIDs map[string]bool) beads.GraphApplyNode {
+func buildRalphRetryGraphNode(old beads.Bead, logicalID, oldScopeRef, newScopeRef string, oldAttempt, nextAttempt int, attemptIDs map[string]bool, cityPath string) beads.GraphApplyNode {
 	meta := cloneMetadata(old.Metadata)
 	clearRetryEphemera(meta)
 	meta["gc.attempt"] = strconv.Itoa(nextAttempt)
@@ -487,8 +487,8 @@ func buildRalphRetryGraphNode(old beads.Bead, logicalID, oldScopeRef, newScopeRe
 		Title:             old.Title,
 		Description:       old.Description,
 		Type:              old.Type,
-		Assignee:          retryPreservedAssignee(old),
-		AssignAfterCreate: retryPreservedAssignee(old) != "",
+		Assignee:          retryPreservedAssignee(old, cityPath),
+		AssignAfterCreate: retryPreservedAssignee(old, cityPath) != "",
 		From:              old.From,
 		Labels:            append([]string{}, old.Labels...),
 		Metadata:          meta,
@@ -498,14 +498,12 @@ func buildRalphRetryGraphNode(old beads.Bead, logicalID, oldScopeRef, newScopeRe
 	}
 }
 
-func retryPreservedAssignee(bead beads.Bead) string {
+func retryPreservedAssignee(bead beads.Bead, cityPath string) string {
 	if bead.Assignee == "" {
 		return ""
 	}
-	for _, label := range bead.Labels {
-		if strings.HasPrefix(label, "pool:") {
-			return ""
-		}
+	if beadUsesMetadataPoolRoute(bead, cityPath) {
+		return ""
 	}
 	return bead.Assignee
 }

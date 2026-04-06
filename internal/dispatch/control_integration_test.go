@@ -476,9 +476,9 @@ func TestBuildAttemptRecipeEnrichesNestedRalphChildren(t *testing.T) {
 	}
 }
 
-// TestSpawnNextAttemptPropagatesRoutingLabels verifies that
-// spawnNextAttempt stamps pool:agent labels from gc.execution_routed_to.
-func TestSpawnNextAttemptPropagatesRoutingLabels(t *testing.T) {
+// TestSpawnNextAttemptPropagatesRoutingMetadata verifies that
+// spawnNextAttempt stamps gc.routed_to metadata from gc.execution_routed_to.
+func TestSpawnNextAttemptPropagatesRoutingMetadata(t *testing.T) {
 	t.Parallel()
 	store := beads.NewMemStore()
 
@@ -536,15 +536,10 @@ func TestSpawnNextAttemptPropagatesRoutingLabels(t *testing.T) {
 		t.Errorf("attempt 2 gc.routed_to = %q, want polecat", attempt2.Metadata["gc.routed_to"])
 	}
 
-	// Check labels on the bead.
-	hasPoolLabel := false
 	for _, l := range attempt2.Labels {
 		if l == "pool:polecat" {
-			hasPoolLabel = true
+			t.Errorf("attempt 2 labels = %v, should not contain legacy pool label", attempt2.Labels)
 		}
-	}
-	if !hasPoolLabel {
-		t.Errorf("attempt 2 labels = %v, want pool:polecat", attempt2.Labels)
 	}
 }
 
@@ -638,8 +633,8 @@ max = -1
 	if scope.Metadata["gc.routed_to"] != "gascity/claude" {
 		t.Fatalf("scope gc.routed_to = %q, want gascity/claude", scope.Metadata["gc.routed_to"])
 	}
-	if !containsString(scope.Labels, "pool:gascity/claude") {
-		t.Fatalf("scope labels = %v, want pool:gascity/claude", scope.Labels)
+	if containsString(scope.Labels, "pool:gascity/claude") {
+		t.Fatalf("scope labels = %v, should not contain legacy pool label", scope.Labels)
 	}
 
 	claude := findAttemptByRef(t, store, root.ID, "mol-adopt-pr-v2.review-loop.iteration.2.review-claude")
@@ -649,8 +644,8 @@ max = -1
 	if claude.Metadata["gc.routed_to"] != "gascity/claude" {
 		t.Fatalf("review-claude gc.routed_to = %q, want gascity/claude", claude.Metadata["gc.routed_to"])
 	}
-	if !containsString(claude.Labels, "pool:gascity/claude") {
-		t.Fatalf("review-claude labels = %v, want pool:gascity/claude", claude.Labels)
+	if containsString(claude.Labels, "pool:gascity/claude") {
+		t.Fatalf("review-claude labels = %v, should not contain legacy pool label", claude.Labels)
 	}
 	if claude.Assignee != "" {
 		t.Fatalf("review-claude assignee = %q, want empty for pool route", claude.Assignee)
@@ -666,8 +661,8 @@ max = -1
 	if codex.Metadata["gc.execution_routed_to"] != "gascity/codex" {
 		t.Fatalf("review-codex gc.execution_routed_to = %q, want gascity/codex", codex.Metadata["gc.execution_routed_to"])
 	}
-	if !containsString(codex.Labels, "pool:gascity/codex") {
-		t.Fatalf("review-codex labels = %v, want pool:gascity/codex", codex.Labels)
+	if containsString(codex.Labels, "pool:gascity/codex") {
+		t.Fatalf("review-codex labels = %v, should not contain legacy pool label", codex.Labels)
 	}
 	if containsString(codex.Labels, "pool:gascity/claude") {
 		t.Fatalf("review-codex labels = %v, should not contain pool:gascity/claude", codex.Labels)
@@ -683,8 +678,8 @@ max = -1
 	if synthesize.Metadata["gc.routed_to"] != "gascity/claude" {
 		t.Fatalf("synthesize gc.routed_to = %q, want gascity/claude fallback", synthesize.Metadata["gc.routed_to"])
 	}
-	if !containsString(synthesize.Labels, "pool:gascity/claude") {
-		t.Fatalf("synthesize labels = %v, want pool:gascity/claude fallback", synthesize.Labels)
+	if containsString(synthesize.Labels, "pool:gascity/claude") {
+		t.Fatalf("synthesize labels = %v, should not contain legacy pool label", synthesize.Labels)
 	}
 }
 

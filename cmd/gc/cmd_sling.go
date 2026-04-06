@@ -949,9 +949,10 @@ func slingFormulaUsesTargetBranch(formula string) bool {
 }
 
 // resolveSlingEnv returns extra env vars for the sling command.
-// For fixed (non-pool) agents, resolves the target's session name from
-// the bead store and returns it as GC_SLING_TARGET. Pool agents don't
-// need this — they use label-based dispatch.
+// For fixed single-session agents, resolves the target's session name from
+// the bead store and returns it as GC_SLING_TARGET. Default routing uses
+// gc.routed_to metadata for all agents, but custom sling_query templates may
+// still rely on the resolved concrete session target.
 func resolveSlingEnv(a config.Agent, deps slingDeps) map[string]string {
 	if isMultiSessionCfgAgent(&a) {
 		return nil
@@ -1121,7 +1122,7 @@ func decorateGraphWorkflowRecipe(recipe *formula.Recipe, routeVars map[string]st
 	if sessionName != "" {
 		defaultRoute.sessionName = sessionName
 	} else {
-		defaultRoute.label = "pool:" + routedTo
+		defaultRoute.metadataOnly = true
 	}
 	routingRigContext := graphRouteRigContext(defaultRoute.qualifiedName)
 	controlRoute, err := controlDispatcherBinding(store, cityName, cfg, routingRigContext)
@@ -1213,7 +1214,7 @@ func workflowStoreRefForDir(storeDir, cityPath, cityName string, cfg *config.Cit
 type graphRouteBinding struct {
 	qualifiedName string
 	sessionName   string
-	label         string
+	metadataOnly  bool
 }
 
 func resolveGraphStepBinding(stepID string, stepByID map[string]*formula.RecipeStep, stepAlias map[string]string, depsByStep map[string][]string, cache map[string]graphRouteBinding, resolving map[string]bool, fallback graphRouteBinding, rigContext string, store beads.Store, cityName string, cfg *config.City) (graphRouteBinding, error) {
@@ -1327,7 +1328,7 @@ func resolveGraphStepBindingWithVars(stepID string, stepByID map[string]*formula
 	}
 	binding := graphRouteBinding{qualifiedName: agentCfg.QualifiedName()}
 	if isMultiSessionCfgAgent(&agentCfg) {
-		binding.label = "pool:" + agentCfg.QualifiedName()
+		binding.metadataOnly = true
 		cache[stepID] = binding
 		return binding, nil
 	}
@@ -1461,6 +1462,9 @@ func checkBeadState(q BeadQuerier, beadID string, a config.Agent) beadCheckResul
 		if b.Assignee != "" {
 			warnings = append(warnings, fmt.Sprintf("warning: bead %s already assigned to %q", beadID, b.Assignee))
 		}
+		if routedTo := strings.TrimSpace(b.Metadata["gc.routed_to"]); routedTo != "" {
+			warnings = append(warnings, fmt.Sprintf("warning: bead %s already routed to %q", beadID, routedTo))
+		}
 		for _, l := range b.Labels {
 			if strings.HasPrefix(l, "pool:") {
 				warnings = append(warnings, fmt.Sprintf("warning: bead %s already has pool label %q", beadID, l))
@@ -1470,8 +1474,11 @@ func checkBeadState(q BeadQuerier, beadID string, a config.Agent) beadCheckResul
 	}
 
 	target := a.QualifiedName()
+	if strings.TrimSpace(b.Metadata["gc.routed_to"]) == target {
+		return beadCheckResult{Idempotent: true}
+	}
 
-	// Fixed agent: check assignee match.
+	// Fixed agent: check legacy assignee routing as a compatibility fallback.
 	if !isMultiSessionCfgAgent(&a) {
 		if b.Assignee == target {
 			return beadCheckResult{Idempotent: true}
@@ -1479,6 +1486,9 @@ func checkBeadState(q BeadQuerier, beadID string, a config.Agent) beadCheckResul
 		var warnings []string
 		if b.Assignee != "" {
 			warnings = append(warnings, fmt.Sprintf("warning: bead %s already assigned to %q", beadID, b.Assignee))
+		}
+		if routedTo := strings.TrimSpace(b.Metadata["gc.routed_to"]); routedTo != "" {
+			warnings = append(warnings, fmt.Sprintf("warning: bead %s already routed to %q", beadID, routedTo))
 		}
 		for _, l := range b.Labels {
 			if strings.HasPrefix(l, "pool:") {
@@ -1488,7 +1498,8 @@ func checkBeadState(q BeadQuerier, beadID string, a config.Agent) beadCheckResul
 		return beadCheckResult{Warnings: warnings}
 	}
 
-	// Pool: check for matching pool label.
+	// Multi-session targets should also route through gc.routed_to. Matching
+	// pool labels are only a legacy compatibility fallback.
 	poolLabel := "pool:" + target
 	for _, l := range b.Labels {
 		if l == poolLabel {
@@ -1498,6 +1509,9 @@ func checkBeadState(q BeadQuerier, beadID string, a config.Agent) beadCheckResul
 	var warnings []string
 	if b.Assignee != "" {
 		warnings = append(warnings, fmt.Sprintf("warning: bead %s already assigned to %q", beadID, b.Assignee))
+	}
+	if routedTo := strings.TrimSpace(b.Metadata["gc.routed_to"]); routedTo != "" {
+		warnings = append(warnings, fmt.Sprintf("warning: bead %s already routed to %q", beadID, routedTo))
 	}
 	for _, l := range b.Labels {
 		if strings.HasPrefix(l, "pool:") {

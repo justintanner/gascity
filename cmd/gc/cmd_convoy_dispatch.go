@@ -290,7 +290,7 @@ func graphFallbackBindingForBead(source beads.Bead, store beads.Store, cityName 
 
 	binding := graphRouteBinding{qualifiedName: agentCfg.QualifiedName()}
 	if isMultiSessionCfgAgent(&agentCfg) {
-		binding.label = "pool:" + agentCfg.QualifiedName()
+		binding.metadataOnly = true
 		return binding, nil
 	}
 	if source.Assignee != "" {

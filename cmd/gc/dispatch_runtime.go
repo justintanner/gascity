@@ -64,8 +64,7 @@ func controlDispatcherBinding(store beads.Store, cityName string, cfg *config.Ci
 
 func applyGraphRouteBinding(step *formula.RecipeStep, binding graphRouteBinding) {
 	step.Metadata["gc.routed_to"] = binding.qualifiedName
-	if binding.label != "" {
-		step.Labels = appendUniqueString(step.Labels, binding.label)
+	if binding.metadataOnly {
 		step.Assignee = ""
 		return
 	}

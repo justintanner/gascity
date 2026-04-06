@@ -256,8 +256,7 @@ func (m *memoryOrderDispatcher) dispatchWisp(ctx context.Context, a orders.Order
 	}
 
 	// Decorate graph workflow recipes with routing metadata so child step
-	// beads get gc.routed_to set. Without this, only the root bead gets the
-	// pool label and agents cannot discover their step work.
+	// beads get gc.routed_to set before instantiation.
 	if a.Pool != "" {
 		pool := qualifyPool(a.Pool, a.Rig)
 		if err := applyGraphRouting(recipe, nil, pool, nil, "", "", "", "", m.store, m.cityName, m.cfg); err != nil {
@@ -287,7 +286,7 @@ func (m *memoryOrderDispatcher) dispatchWisp(ctx context.Context, a orders.Order
 	}
 	if a.Pool != "" {
 		pool := qualifyPool(a.Pool, a.Rig)
-		args = append(args, fmt.Sprintf("--add-label=pool:%s", pool))
+		args = append(args, "--set-metadata", "gc.routed_to="+pool)
 	}
 	if _, err := m.runner(cityPath, "bd", args...); err != nil {
 		// Label failure is critical for duplicate-dispatch prevention.

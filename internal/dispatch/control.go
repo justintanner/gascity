@@ -462,8 +462,7 @@ func applyAttemptStepRoute(step *formula.RecipeStep, target string, cfg *config.
 		step.Metadata["gc.routed_to"] = binding.qualifiedName
 		step.Metadata["gc.execution_routed_to"] = binding.qualifiedName
 		step.Labels = removeAttemptPoolLabels(step.Labels)
-		if binding.poolLabel != "" {
-			step.Labels = appendUniqueAttemptLabel(step.Labels, binding.poolLabel)
+		if binding.metadataOnly {
 			step.Assignee = ""
 			return
 		}
@@ -473,12 +472,13 @@ func applyAttemptStepRoute(step *formula.RecipeStep, target string, cfg *config.
 
 	step.Metadata["gc.routed_to"] = target
 	step.Metadata["gc.execution_routed_to"] = target
-	step.Labels = appendUniqueAttemptLabel(step.Labels, "pool:"+target)
+	step.Labels = removeAttemptPoolLabels(step.Labels)
+	step.Assignee = ""
 }
 
 type attemptRouteBinding struct {
 	qualifiedName string
-	poolLabel     string
+	metadataOnly  bool
 	sessionName   string
 }
 
@@ -489,14 +489,8 @@ func resolveAttemptRouteBinding(target string, cfg *config.City) (attemptRouteBi
 
 	if agentCfg := config.FindAgent(cfg, target); agentCfg != nil {
 		binding := attemptRouteBinding{qualifiedName: agentCfg.QualifiedName()}
-		maxSess := agentCfg.EffectiveMaxActiveSessions()
-		isMultiSession := maxSess == nil || *maxSess != 1
-		if isMultiSession {
-			label := agentCfg.QualifiedName()
-			if agentCfg.PoolName != "" {
-				label = agentCfg.PoolName
-			}
-			binding.poolLabel = "pool:" + label
+		if isAttemptMultiSessionTarget(agentCfg.QualifiedName(), cfg) {
+			binding.metadataOnly = true
 			return binding, true
 		}
 		binding.sessionName = config.NamedSessionRuntimeName(cfg.EffectiveCityName(), cfg.Workspace, agentCfg.QualifiedName())
@@ -511,6 +505,41 @@ func resolveAttemptRouteBinding(target string, cfg *config.City) (attemptRouteBi
 	}
 
 	return attemptRouteBinding{}, false
+}
+
+func routedAttemptTarget(bead beads.Bead) string {
+	if bead.Metadata == nil {
+		return ""
+	}
+	if target := strings.TrimSpace(bead.Metadata["gc.execution_routed_to"]); target != "" {
+		return target
+	}
+	return strings.TrimSpace(bead.Metadata["gc.routed_to"])
+}
+
+func isAttemptMultiSessionTarget(target string, cfg *config.City) bool {
+	if cfg == nil || strings.TrimSpace(target) == "" {
+		return false
+	}
+	agentCfg := config.FindAgent(cfg, target)
+	if agentCfg == nil {
+		return false
+	}
+	maxSess := agentCfg.EffectiveMaxActiveSessions()
+	return maxSess == nil || *maxSess != 1
+}
+
+func beadUsesMetadataPoolRoute(bead beads.Bead, cityPath string) bool {
+	cfg := loadAttemptRouteConfig(cityPath)
+	if isAttemptMultiSessionTarget(routedAttemptTarget(bead), cfg) {
+		return true
+	}
+	for _, label := range bead.Labels {
+		if strings.HasPrefix(label, "pool:") {
+			return true
+		}
+	}
+	return false
 }
 
 func removeAttemptPoolLabels(labels []string) []string {

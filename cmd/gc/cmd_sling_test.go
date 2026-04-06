@@ -2830,12 +2830,12 @@ func TestDryRunNilQuerier(t *testing.T) {
 // --- Idempotency detection (checkBeadState + integration) tests ---
 
 func TestCheckBeadStateIdempotentFixedAgent(t *testing.T) {
-	q := &fakeQuerier{bead: beads.Bead{ID: "BL-42", Assignee: "mayor"}}
+	q := &fakeQuerier{bead: beads.Bead{ID: "BL-42", Metadata: map[string]string{"gc.routed_to": "mayor"}}}
 	a := config.Agent{Name: "mayor", MaxActiveSessions: intPtr(1)}
 
 	result := checkBeadState(q, "BL-42", a)
 	if !result.Idempotent {
-		t.Error("expected Idempotent=true for matching assignee")
+		t.Error("expected Idempotent=true for matching gc.routed_to")
 	}
 	if len(result.Warnings) != 0 {
 		t.Errorf("expected no warnings, got %v", result.Warnings)
@@ -2843,12 +2843,12 @@ func TestCheckBeadStateIdempotentFixedAgent(t *testing.T) {
 }
 
 func TestCheckBeadStateIdempotentPool(t *testing.T) {
-	q := &fakeQuerier{bead: beads.Bead{ID: "BL-42", Labels: []string{"pool:hw/polecat"}}}
+	q := &fakeQuerier{bead: beads.Bead{ID: "BL-42", Metadata: map[string]string{"gc.routed_to": "hw/polecat"}}}
 	a := config.Agent{Name: "polecat", Dir: "hw", MinActiveSessions: intPtr(1), MaxActiveSessions: intPtr(3)}
 
 	result := checkBeadState(q, "BL-42", a)
 	if !result.Idempotent {
-		t.Error("expected Idempotent=true for matching pool label")
+		t.Error("expected Idempotent=true for matching gc.routed_to")
 	}
 	if len(result.Warnings) != 0 {
 		t.Errorf("expected no warnings, got %v", result.Warnings)
@@ -2857,14 +2857,15 @@ func TestCheckBeadStateIdempotentPool(t *testing.T) {
 
 func TestCheckBeadStateIdempotentPoolMultiLabels(t *testing.T) {
 	q := &fakeQuerier{bead: beads.Bead{
-		ID:     "BL-42",
-		Labels: []string{"priority:high", "pool:hw/polecat", "sprint:3"},
+		ID:       "BL-42",
+		Labels:   []string{"priority:high", "sprint:3"},
+		Metadata: map[string]string{"gc.routed_to": "hw/polecat"},
 	}}
 	a := config.Agent{Name: "polecat", Dir: "hw", MinActiveSessions: intPtr(1), MaxActiveSessions: intPtr(3)}
 
 	result := checkBeadState(q, "BL-42", a)
 	if !result.Idempotent {
-		t.Error("expected Idempotent=true for matching pool label among others")
+		t.Error("expected Idempotent=true for matching gc.routed_to among other labels")
 	}
 }
 
@@ -2921,7 +2922,7 @@ func TestDoSlingIdempotentSkipsRouting(t *testing.T) {
 	sp := runtime.NewFake()
 	cfg := &config.City{Workspace: config.Workspace{Name: "test-city"}}
 	a := config.Agent{Name: "mayor", MaxActiveSessions: intPtr(1)}
-	q := &fakeQuerier{bead: beads.Bead{ID: "BL-42", Assignee: "mayor"}}
+	q := &fakeQuerier{bead: beads.Bead{ID: "BL-42", Metadata: map[string]string{"gc.routed_to": "mayor"}}}
 
 	deps, stdout, _ := testDeps(cfg, sp, runner.run)
 	opts := testOpts(a, "BL-42")

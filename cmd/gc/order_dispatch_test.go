@@ -96,15 +96,15 @@ func TestOrderDispatchCooldownDue(t *testing.T) {
 		t.Error("tracking bead missing order-run:test-order label")
 	}
 
-	// Verify wisp was labeled with pool routing.
-	foundPool := false
+	// Verify wisp was stamped with routed_to metadata.
+	foundRoute := false
 	for _, a := range labelArgs {
-		if a == "--add-label=pool:worker" {
-			foundPool = true
+		if a == "gc.routed_to=worker" {
+			foundRoute = true
 		}
 	}
-	if !foundPool {
-		t.Errorf("missing pool label, got %v", labelArgs)
+	if !foundRoute {
+		t.Errorf("missing routed_to metadata, got %v", labelArgs)
 	}
 }
 
@@ -712,9 +712,9 @@ func TestOrderDispatchRigScoped(t *testing.T) {
 	if !found["--add-label=order-run:db-health:rig:demo-repo"] {
 		t.Errorf("missing scoped order-run label, got %v", labelArgs)
 	}
-	// Auto-qualified pool.
-	if !found["--add-label=pool:demo-repo/polecat"] {
-		t.Errorf("missing qualified pool label, got %v", labelArgs)
+	// Auto-qualified routed_to target.
+	if !found["gc.routed_to=demo-repo/polecat"] {
+		t.Errorf("missing qualified routed_to metadata, got %v", labelArgs)
 	}
 }
 
