@@ -14,7 +14,7 @@
 
 [workspace]
 name = "gascity-prod"
-provider = "claude"
+provider = "opencode"
 # Absolute path to the gastown pack shipped inside the image at
 # /app/gascity/examples/gastown/packs/gastown. Using an absolute path
 # avoids having to symlink packs/ into the /gc volume on first boot.

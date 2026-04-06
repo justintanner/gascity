@@ -13,6 +13,23 @@ git config --global credential.helper store
 dolt config --global --add user.name "$GIT_USER" >/dev/null 2>&1 || true
 dolt config --global --add user.email "$GIT_EMAIL" >/dev/null 2>&1 || true
 
+# --- Opencode + Fireworks AI bootstrap ---
+# Opencode reads its default model from ~/.local/state/opencode/model.json
+# and its provider auth from ~/.local/share/opencode/auth.json. We write
+# both here so opencode launches pointed at Fireworks with a valid key,
+# without requiring any opencode-specific TOML or plugins in the city.
+# FIREWORKS_AI_API_KEY is injected via Kamal env.secret (see config/deploy.yml).
+if [ -n "${FIREWORKS_AI_API_KEY:-}" ]; then
+    mkdir -p "$HOME/.local/state/opencode" "$HOME/.local/share/opencode"
+    cat > "$HOME/.local/state/opencode/model.json" <<'MODELJSON'
+{"recent":[{"providerID":"fireworks-ai","modelID":"accounts/fireworks/routers/kimi-k2p5-turbo"}],"favorite":[],"variant":{}}
+MODELJSON
+    cat > "$HOME/.local/share/opencode/auth.json" <<AUTHJSON
+{"fireworks-ai":{"type":"api","key":"$FIREWORKS_AI_API_KEY"}}
+AUTHJSON
+    chmod 600 "$HOME/.local/share/opencode/auth.json"
+fi
+
 # --- Bootstrap or resume /gc workspace ---
 # /gc is a Kamal-managed Docker volume, so anything COPYed into /gc in
 # the image is shadowed at runtime. On first boot we let `gc init`

@@ -1,4 +1,9 @@
 #!/bin/sh
-# Pre-deploy hook: runs locally before Kamal pushes the image.
-# Currently a no-op; add any pre-flight checks here.
-echo "==> Pre-deploy hook (no-op)"
+# Gracefully shut down gascity before Kamal deploys a new container.
+# Runs locally before deploy — uses kamal to exec `gc stop` on the server.
+
+set -e
+
+echo "==> Gracefully shutting down gascity..."
+kamal app exec --reuse "gc stop /gc" 2>/dev/null || true
+echo "==> gascity shutdown complete, proceeding with deploy."

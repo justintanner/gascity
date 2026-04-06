@@ -45,6 +45,16 @@ RUN GOBIN=/usr/local/bin CGO_ENABLED=1 go install \
 # Install dolt (SQL database engine used by the bd beads backend).
 RUN curl -fsSL https://github.com/dolthub/dolt/releases/latest/download/install.sh | bash
 
+# Install the Codex CLI. The base image ships `claude` but not `codex`;
+# npm is already present in the claude-code base image.
+RUN npm install -g @openai/codex
+
+# Install opencode. Same npm pattern as codex above. prod-city.toml sets
+# provider = "opencode" against Fireworks AI; docker-entrypoint.sh writes
+# opencode's auth.json + model.json at container start from
+# $FIREWORKS_AI_API_KEY (injected via Kamal env.secret).
+RUN npm install -g opencode-ai
+
 # Create app + workspace directories. /gc is a Kamal volume mount at
 # runtime, so anything baked here gets shadowed — bootstrapping happens
 # in docker-entrypoint.sh.

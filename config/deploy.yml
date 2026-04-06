@@ -30,6 +30,7 @@ env:
   secret:
     - ANTHROPIC_API_KEY
     - GH_APP_PEM
+    - FIREWORKS_AI_API_KEY
 
 builder:
   arch: amd64
