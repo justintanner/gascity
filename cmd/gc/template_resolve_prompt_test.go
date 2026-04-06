@@ -137,6 +137,34 @@ func TestTemplateParamsToConfigNoneModePreservesExistingNudge(t *testing.T) {
 	}
 }
 
+// TestTemplateParamsToConfigNoneModeWithHooksSkipsPromptInNudge verifies that
+// when PromptMode is "none" and the provider has hooks, the prompt is NOT
+// prepended to the nudge — the plugin injects it via system.transform instead.
+func TestTemplateParamsToConfigNoneModeWithHooksSkipsPromptInNudge(t *testing.T) {
+	tp := TemplateParams{
+		Command: "opencode",
+		Prompt:  "You are an agent. Do work.",
+		Hints: agent.StartupHints{
+			Nudge: "Check your hook for work.",
+		},
+		ResolvedProvider: &config.ResolvedProvider{
+			Name:          "opencode",
+			Command:       "opencode",
+			PromptMode:    "none",
+			SupportsHooks: true,
+		},
+	}
+
+	cfg := templateParamsToConfig(tp)
+
+	if cfg.PromptSuffix != "" {
+		t.Errorf("PromptSuffix should be empty for none mode, got %q", cfg.PromptSuffix)
+	}
+	if cfg.Nudge != "Check your hook for work." {
+		t.Errorf("Nudge = %q, want only the agent nudge (prompt should be handled by plugin)", cfg.Nudge)
+	}
+}
+
 // TestTemplateParamsToConfigFlagModeEmptyPrompt verifies that when
 // PromptMode is "flag" but the prompt is empty, no PromptSuffix is set.
 func TestTemplateParamsToConfigFlagModeEmptyPrompt(t *testing.T) {

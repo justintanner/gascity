@@ -365,13 +365,17 @@ func templateParamsToConfig(tp TemplateParams) runtime.Config {
 	var promptFlag string
 	nudge := tp.Hints.Nudge
 	if tp.Prompt != "" {
-		if tp.ResolvedProvider != nil && tp.ResolvedProvider.PromptMode == "none" {
+		if tp.ResolvedProvider != nil && tp.ResolvedProvider.PromptMode == "none" &&
+			!tp.ResolvedProvider.SupportsHooks {
+			// No hook mechanism — prompt must be sent as a tmux nudge.
+			// When hooks ARE available, the plugin injects the prompt
+			// via system.transform; only the short nudge text is sent.
 			if nudge != "" {
 				nudge = tp.Prompt + "\n\n---\n\n" + nudge
 			} else {
 				nudge = tp.Prompt
 			}
-		} else {
+		} else if tp.ResolvedProvider == nil || tp.ResolvedProvider.PromptMode != "none" {
 			promptSuffix = shellquote.Quote(tp.Prompt)
 			if tp.ResolvedProvider != nil && tp.ResolvedProvider.PromptMode == "flag" && tp.ResolvedProvider.PromptFlag != "" {
 				promptFlag = tp.ResolvedProvider.PromptFlag
