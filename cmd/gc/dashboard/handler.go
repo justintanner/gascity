@@ -520,6 +520,14 @@ func NewDashboardMux(fetcher *APIFetcher, cityPath, cityName, apiURL string, isS
 	mux.Handle("/api/", apiHandler)
 	mux.HandleFunc("/panels/activity", convoyHandler.ServeActivityPanel)
 	mux.Handle("/static/", http.StripPrefix("/static/", staticHandler))
+	// /up is a liveness endpoint for the Kamal proxy healthcheck. It
+	// returns 200 unconditionally as long as the dashboard HTTP server
+	// is accepting connections; controller liveness is observed through
+	// the dashboard content itself.
+	mux.HandleFunc("/up", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 	mux.Handle("/", convoyHandler)
 
 	return mux, nil

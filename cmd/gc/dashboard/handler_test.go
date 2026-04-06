@@ -103,3 +103,35 @@ func TestConvoyHandlerServiceErrorRendersFetchFailedState(t *testing.T) {
 		t.Fatalf("response missing fetch-failed count badge:\n%s", body)
 	}
 }
+
+func TestDashboardMuxUpEndpoint(t *testing.T) {
+	// /up must return 200 even when the upstream API server is
+	// unreachable — it is a liveness probe for the dashboard process
+	// itself, not an end-to-end health check.
+	fetcher := NewAPIFetcher("http://127.0.0.1:1", "/tmp/city", "test-city")
+
+	mux, err := NewDashboardMux(
+		fetcher,
+		"/tmp/city",
+		"test-city",
+		"http://127.0.0.1:1",
+		false,
+		50*time.Millisecond,
+		1*time.Second,
+		2*time.Second,
+	)
+	if err != nil {
+		t.Fatalf("NewDashboardMux: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/up", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if body := rec.Body.String(); body != "ok" {
+		t.Fatalf("body = %q, want %q", body, "ok")
+	}
+}

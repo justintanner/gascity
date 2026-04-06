@@ -1,0 +1,41 @@
+# Production city config baked into the gascity Docker image.
+#
+# This file is NOT loaded directly from /app/gascity/config — the
+# docker-entrypoint.sh copies it to /gc/city.toml on first boot (because
+# /gc is a Kamal-managed Docker volume, so anything the image puts at /gc
+# is shadowed at runtime).
+#
+# Rigs and agents are intentionally empty. Register them live on the
+# server via:
+#   kamal app exec --interactive --reuse "bash"
+#   gc rig add <path>
+#   # edit /gc/city.toml to add [[agent]] entries, then
+#   gc stop /gc && gc start /gc
+
+[workspace]
+name = "gascity-prod"
+provider = "claude"
+# Absolute path to the gastown pack shipped inside the image at
+# /app/gascity/examples/gastown/packs/gastown. Using an absolute path
+# avoids having to symlink packs/ into the /gc volume on first boot.
+includes = ["/app/gascity/examples/gastown/packs/gastown"]
+
+[daemon]
+patrol_interval = "30s"
+max_restarts = 5
+restart_window = "1h"
+shutdown_timeout = "5s"
+
+[api]
+# The machine-wide supervisor on :8372 owns the HTTP API in this
+# deployment; per-city ports are ignored at startup with a warning.
+# Left here for clarity and so `gc start --foreground` still works in
+# debug contexts.
+port = 9443
+bind = "127.0.0.1"
+
+[beads]
+provider = "bd"
+
+[session]
+provider = "tmux"

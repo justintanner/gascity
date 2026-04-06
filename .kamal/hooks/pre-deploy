@@ -1,0 +1,4 @@
+#!/bin/sh
+# Pre-deploy hook: runs locally before Kamal pushes the image.
+# Currently a no-op; add any pre-flight checks here.
+echo "==> Pre-deploy hook (no-op)"

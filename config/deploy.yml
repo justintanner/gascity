@@ -1,0 +1,44 @@
+service: gascity
+image: justintanner/gascity
+primary_role: controller
+
+servers:
+  controller:
+    hosts:
+      - 65.21.88.38
+    proxy:
+      host: superlzy.com
+      app_port: 8080
+      ssl: true
+      healthcheck:
+        path: /up
+        interval: 10
+        timeout: 5
+    options:
+      memory: 16g
+
+registry:
+  server: localhost:5555
+
+env:
+  clear:
+    GIT_USER: "jwt-gascity[bot]"
+    GIT_EMAIL: "jwt-gascity[bot]@users.noreply.github.com"
+    TERM: "xterm-256color"
+  secret:
+    - ANTHROPIC_API_KEY
+
+builder:
+  arch: amd64
+
+volumes:
+  - gascity-workspace:/gc
+
+aliases:
+  shell: app exec --interactive --reuse "bash"
+  logs: app exec --reuse "tail -100 /gc/.gc/events.jsonl"
+  status: app exec --reuse "gc status"
+  agents: app exec --reuse "gc agent list"
+  beads: app exec --reuse "gc beads list"
+  formulas: app exec --reuse "gc formula list"
+  supervisor: app exec --reuse "gc supervisor status"

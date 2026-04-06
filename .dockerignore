@@ -6,3 +6,5 @@ test
 *.md
 !contrib/**
 coverage.txt
+bin/
+.kamal
