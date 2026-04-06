@@ -356,7 +356,7 @@ func retryAttemptBead(prev beads.Bead, logicalID, stepRef string, attempt int, c
 		From:        prev.From,
 		ParentID:    prev.ParentID,
 		Ref:         stepRef,
-		Labels:      append([]string{}, prev.Labels...),
+		Labels:      removeAttemptPoolLabels(prev.Labels),
 		Metadata:    meta,
 	}
 }
@@ -375,7 +375,7 @@ func retryEvalBead(prev beads.Bead, logicalID, stepRef string, attempt int) bead
 		From:        prev.From,
 		ParentID:    prev.ParentID,
 		Ref:         stepRef,
-		Labels:      append([]string{}, prev.Labels...),
+		Labels:      removeAttemptPoolLabels(prev.Labels),
 		Metadata:    meta,
 	}
 }

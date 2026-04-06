@@ -56,6 +56,7 @@ gc [flags]
 | [gc stop](#gc-stop) | Stop all agent sessions in the city |
 | [gc supervisor](#gc-supervisor) | Manage the machine-wide supervisor |
 | [gc suspend](#gc-suspend) | Suspend the city (all agents effectively suspended) |
+| [gc trace](#gc-trace) | Inspect and control session reconciler tracing |
 | [gc unregister](#gc-unregister) | Remove a city from the machine-wide supervisor |
 | [gc version](#gc-version) | Print gc version |
 | [gc wait](#gc-wait) | Inspect and manage durable session waits |
@@ -1177,7 +1178,7 @@ gc order history [name] [flags]
 
 ## gc order list
 
-List all available orders with their gate type, schedule, and target pool.
+List all available orders with their gate type, schedule, and target.
 
 Scans formula layers for formulas that have order metadata
 (gate, interval, schedule, check, pool).
@@ -1191,7 +1192,7 @@ gc order list
 Execute an order manually, bypassing its gate conditions.
 
 Instantiates a wisp from the order's formula and routes it to the
-target pool (if configured). Useful for testing orders or triggering
+configured target (if any). Useful for testing orders or triggering
 them outside their normal schedule.
 Use --rig to disambiguate same-name orders in different rigs.
 
@@ -1208,7 +1209,7 @@ gc order run <name> [flags]
 Display detailed information about a named order.
 
 Shows the order name, description, formula reference, gate type,
-scheduling parameters, check command, target pool, and source file.
+scheduling parameters, check command, target, and source file.
 Use --rig to disambiguate same-name orders in different rigs.
 
 ```
@@ -2066,6 +2067,119 @@ Use "gc resume" to restore.
 ```
 gc suspend [path]
 ```
+
+## gc trace
+
+Inspect and control the session reconciler trace stream.
+
+Trace state is persisted locally under .gc/runtime/session-reconciler-trace
+and can be managed even when the controller is offline.
+
+```
+gc trace
+```
+
+| Subcommand | Description |
+|------------|-------------|
+| [gc trace cycle](#gc-trace-cycle) | Show a cycle by tick id |
+| [gc trace reasons](#gc-trace-reasons) | Show reason codes observed in trace records |
+| [gc trace show](#gc-trace-show) | Show trace records |
+| [gc trace start](#gc-trace-start) | Start or extend tracing for a template |
+| [gc trace status](#gc-trace-status) | Show trace arms and stream state |
+| [gc trace stop](#gc-trace-stop) | Stop tracing for a template |
+| [gc trace tail](#gc-trace-tail) | Follow trace records |
+
+## gc trace cycle
+
+Show a cycle by tick id
+
+```
+gc trace cycle [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--tick` | string |  | tick id to display |
+
+## gc trace reasons
+
+Show reason codes observed in trace records
+
+```
+gc trace reasons [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--since` | string |  | show reasons since duration ago |
+| `--template` | string |  | exact normalized template selector |
+
+## gc trace show
+
+Show trace records
+
+```
+gc trace show [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--json` | bool | `true` | emit JSON array |
+| `--reason` | string |  | filter by reason code |
+| `--since` | string |  | show records since duration ago |
+| `--template` | string |  | exact normalized template selector |
+| `--tick` | string |  | filter by tick id |
+| `--trace-id` | string |  | filter by trace id |
+| `--type` | string |  | filter by record type |
+
+## gc trace start
+
+Start or extend tracing for a template
+
+```
+gc trace start [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--auto` | bool |  | mark the arm as auto-triggered |
+| `--for` | string | `15m` | trace arm duration (e.g. 15m) |
+| `--level` | string | `detail` | trace level: baseline or detail |
+| `--template` | string |  | exact normalized template selector |
+
+## gc trace status
+
+Show trace arms and stream state
+
+```
+gc trace status
+```
+
+## gc trace stop
+
+Stop tracing for a template
+
+```
+gc trace stop [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--all` | bool |  | remove both manual and auto arms |
+| `--template` | string |  | exact normalized template selector |
+
+## gc trace tail
+
+Follow trace records
+
+```
+gc trace tail [flags]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--since` | string |  | follow from duration ago |
+| `--template` | string |  | exact normalized template selector |
 
 ## gc unregister
 

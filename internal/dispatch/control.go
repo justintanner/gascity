@@ -470,6 +470,8 @@ func applyAttemptStepRoute(step *formula.RecipeStep, target string, cfg *config.
 		return
 	}
 
+	// Target not found in config — route via metadata only and clear assignee
+	// to avoid stale routing. Work discovery relies on gc.routed_to (tier 3).
 	step.Metadata["gc.routed_to"] = target
 	step.Metadata["gc.execution_routed_to"] = target
 	step.Labels = removeAttemptPoolLabels(step.Labels)
@@ -530,10 +532,16 @@ func isAttemptMultiSessionTarget(target string, cfg *config.City) bool {
 }
 
 func beadUsesMetadataPoolRoute(bead beads.Bead, cityPath string) bool {
-	cfg := loadAttemptRouteConfig(cityPath)
+	return beadUsesMetadataPoolRouteWithConfig(bead, loadAttemptRouteConfig(cityPath))
+}
+
+func beadUsesMetadataPoolRouteWithConfig(bead beads.Bead, cfg *config.City) bool {
 	if isAttemptMultiSessionTarget(routedAttemptTarget(bead), cfg) {
 		return true
 	}
+	// Legacy fallback: check pool labels on the bead. This function is always
+	// called on the previous attempt's bead (which retains its original labels),
+	// not on the newly cloned bead (which has pool labels stripped).
 	for _, label := range bead.Labels {
 		if strings.HasPrefix(label, "pool:") {
 			return true
@@ -554,15 +562,6 @@ func removeAttemptPoolLabels(labels []string) []string {
 		out = append(out, label)
 	}
 	return out
-}
-
-func appendUniqueAttemptLabel(labels []string, label string) []string {
-	for _, existing := range labels {
-		if existing == label {
-			return labels
-		}
-	}
-	return append(labels, label)
 }
 
 // findLatestAttempt finds the most recent attempt/iteration child of a control bead.

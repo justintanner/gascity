@@ -1367,15 +1367,6 @@ func graphRouteRigContext(route string) string {
 	return route[:idx]
 }
 
-func appendUniqueString(in []string, value string) []string {
-	for _, existing := range in {
-		if existing == value {
-			return in
-		}
-	}
-	return append(in, value)
-}
-
 func shouldPromoteWorkflowLaunchStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "", "open", "ready", "todo", "triage", "backlog":
@@ -1475,7 +1466,16 @@ func checkBeadState(q BeadQuerier, beadID string, a config.Agent) beadCheckResul
 
 	target := a.QualifiedName()
 	if strings.TrimSpace(b.Metadata["gc.routed_to"]) == target {
-		return beadCheckResult{Idempotent: true}
+		// Only idempotent if the bead is unassigned or already assigned
+		// consistently with the target. Otherwise the bead would be
+		// invisible to the target's work_query (which requires --unassigned
+		// for pool work in tier 3).
+		if b.Assignee == "" || b.Assignee == target {
+			return beadCheckResult{Idempotent: true}
+		}
+		return beadCheckResult{
+			Warnings: []string{fmt.Sprintf("warning: bead %s routed to %q but assigned to %q", beadID, target, b.Assignee)},
+		}
 	}
 
 	// Fixed agent: check legacy assignee routing as a compatibility fallback.
@@ -1498,12 +1498,15 @@ func checkBeadState(q BeadQuerier, beadID string, a config.Agent) beadCheckResul
 		return beadCheckResult{Warnings: warnings}
 	}
 
-	// Multi-session targets should also route through gc.routed_to. Matching
-	// pool labels are only a legacy compatibility fallback.
-	poolLabel := "pool:" + target
-	for _, l := range b.Labels {
-		if l == poolLabel {
-			return beadCheckResult{Idempotent: true}
+	// Multi-session targets: pool labels are a legacy fallback only when
+	// gc.routed_to is absent. If gc.routed_to is set (even to a different
+	// target), it is authoritative — a stale pool label must not short-circuit.
+	if strings.TrimSpace(b.Metadata["gc.routed_to"]) == "" {
+		poolLabel := "pool:" + target
+		for _, l := range b.Labels {
+			if l == poolLabel {
+				return beadCheckResult{Idempotent: true}
+			}
 		}
 	}
 	var warnings []string

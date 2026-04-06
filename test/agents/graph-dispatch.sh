@@ -325,7 +325,7 @@ while true; do
     fi
     misses=0
 
-    is_pool_work=$(printf '%s\n' "$bead_json" | jq -r '((.labels // []) | any(startswith("pool:")))' 2>/dev/null || echo "false")
+    is_pool_work=$(printf '%s\n' "$bead_json" | jq -r '((.metadata // {})["gc.routed_to"] // "" | length > 0) or ((.labels // []) | any(startswith("pool:")))' 2>/dev/null || echo "false")
     claimed_here="false"
     if [ "$is_pool_work" = "true" ] && [ "$owns_bead" != "true" ]; then
         if ! claimed=$(timeout 10 bd update "$bead_id" --claim --json 2>/dev/null); then

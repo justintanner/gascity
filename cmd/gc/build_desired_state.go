@@ -423,7 +423,7 @@ func collectAssignedWorkBeads(
 
 func appendAssignedUnique(dst *[]beads.Bead, beadList []beads.Bead, seen map[string]struct{}) {
 	for _, b := range beadList {
-		if strings.TrimSpace(b.Assignee) == "" && strings.TrimSpace(b.Metadata["gc.routed_to"]) == "" {
+		if strings.TrimSpace(b.Assignee) == "" && strings.TrimSpace(b.Metadata["gc.routed_to"]) == "" && !hasPoolLabel(b) {
 			continue
 		}
 		if _, ok := seen[b.ID]; ok {
@@ -432,6 +432,15 @@ func appendAssignedUnique(dst *[]beads.Bead, beadList []beads.Bead, seen map[str
 		seen[b.ID] = struct{}{}
 		*dst = append(*dst, b)
 	}
+}
+
+func hasPoolLabel(b beads.Bead) bool {
+	for _, l := range b.Labels {
+		if strings.HasPrefix(l, "pool:") {
+			return true
+		}
+	}
+	return false
 }
 
 func controlDispatcherOnlyConfig(cfg *config.City) *config.City {

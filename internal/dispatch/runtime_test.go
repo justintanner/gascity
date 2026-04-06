@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gastownhall/gascity/internal/beads"
+	"github.com/gastownhall/gascity/internal/config"
 	"github.com/gastownhall/gascity/internal/formula"
 	"github.com/gastownhall/gascity/internal/molecule"
 )
@@ -975,7 +976,7 @@ func TestBuildRalphRetryGraphNodeRemapsNestedRetryLogicalRef(t *testing.T) {
 	}, "top-logical", "demo.review-loop.run.1", "demo.review-loop.run.2", 1, 2, map[string]bool{
 		"old-eval":    true,
 		"old-logical": true,
-	}, "")
+	}, (*config.City)(nil))
 
 	if got := node.Metadata["gc.step_ref"]; got != "demo.review-loop.run.2.review-claude.eval.1" {
 		t.Fatalf("node gc.step_ref = %q, want demo.review-loop.run.2.review-claude.eval.1", got)
@@ -1005,7 +1006,7 @@ func TestBuildRalphRetryGraphNodeRemapsNestedScopeCheckControlForFromStepRef(t *
 			"gc.step_ref":    "mol-adopt-pr-v2.review-loop.run.3.review-pipeline.review-codex.run.1-scope-check",
 			"gc.control_for": "review-loop.run.3.review-pipeline.review-codex.run.1",
 		},
-	}, "top-logical", "mol-adopt-pr-v2.review-loop.run.3", "mol-adopt-pr-v2.review-loop.run.4", 3, 4, nil, "")
+	}, "top-logical", "mol-adopt-pr-v2.review-loop.run.3", "mol-adopt-pr-v2.review-loop.run.4", 3, 4, nil, (*config.City)(nil))
 
 	if got := node.Metadata["gc.step_ref"]; got != "mol-adopt-pr-v2.review-loop.run.4.review-pipeline.review-codex.run.1-scope-check" {
 		t.Fatalf("node gc.step_ref = %q, want rewritten outer Ralph scope with nested retry attempt unchanged", got)
