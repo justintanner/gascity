@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -278,5 +280,90 @@ func TestLifecycleCoordination_InitDirIfReady_BdDeferred(t *testing.T) {
 		if !strings.Contains(metaText, needle) {
 			t.Fatalf("deferred metadata missing %s:\n%s", needle, metaText)
 		}
+	}
+}
+
+func TestLifecycleCoordination_InitDirIfReady_BdDeferredPreservesExistingDoltDatabaseWhenCanonicalUnknown(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".gc"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".beads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".beads", "metadata.json"), []byte(`{"backend":"dolt","database":"dolt","dolt_mode":"server","dolt_database":"gascity"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	MaterializeBeadsBdScript(dir) //nolint:errcheck
+	t.Setenv("GC_BEADS", "bd")
+	t.Setenv("GC_DOLT", "skip")
+
+	deferred, err := initDirIfReady(dir, dir, "gc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !deferred {
+		t.Fatal("expected bd provider to defer init")
+	}
+
+	metaData, err := os.ReadFile(filepath.Join(dir, ".beads", "metadata.json"))
+	if err != nil {
+		t.Fatalf("read metadata: %v", err)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(metaData, &meta); err != nil {
+		t.Fatalf("unmarshal metadata: %v", err)
+	}
+	if got := strings.TrimSpace(fmt.Sprint(meta["dolt_database"])); got != "gascity" {
+		t.Fatalf("dolt_database = %q, want %q", got, "gascity")
+	}
+}
+
+func TestSeedDeferredManagedBeadsUsesExplicitDoltDatabase(t *testing.T) {
+	dir := t.TempDir()
+
+	seedDeferredManagedBeads(dir, "gc", "gascity")
+
+	configData, err := os.ReadFile(filepath.Join(dir, ".beads", "config.yaml"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if got := string(configData); !strings.Contains(got, "issue_prefix: gc") {
+		t.Fatalf("config should keep the bead prefix, got:\n%s", got)
+	}
+
+	metaData, err := os.ReadFile(filepath.Join(dir, ".beads", "metadata.json"))
+	if err != nil {
+		t.Fatalf("read metadata: %v", err)
+	}
+	metaText := string(metaData)
+	for _, needle := range []string{`"backend": "dolt"`, `"database": "dolt"`, `"dolt_mode": "server"`, `"dolt_database": "gascity"`} {
+		if !strings.Contains(metaText, needle) {
+			t.Fatalf("metadata missing %s:\n%s", needle, metaText)
+		}
+	}
+}
+
+func TestSeedDeferredManagedBeadsPreservesExistingDoltDatabaseWhenCanonicalUnknown(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".beads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".beads", "metadata.json"), []byte(`{"backend":"dolt","database":"dolt","dolt_mode":"server","dolt_database":"gascity"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	seedDeferredManagedBeads(dir, "gc", "")
+
+	metaData, err := os.ReadFile(filepath.Join(dir, ".beads", "metadata.json"))
+	if err != nil {
+		t.Fatalf("read metadata: %v", err)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(metaData, &meta); err != nil {
+		t.Fatalf("unmarshal metadata: %v", err)
+	}
+	if got := strings.TrimSpace(fmt.Sprint(meta["dolt_database"])); got != "gascity" {
+		t.Fatalf("dolt_database = %q, want %q", got, "gascity")
 	}
 }
