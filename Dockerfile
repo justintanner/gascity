@@ -29,6 +29,15 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
+# Install 1Password CLI so the container can read secrets at runtime
+# via OP_SERVICE_ACCOUNT_TOKEN (injected by Kamal from .kamal/secrets).
+RUN curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+    gpg --dearmor -o /usr/share/keyrings/1password-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
+    > /etc/apt/sources.list.d/1password-cli.list && \
+    apt-get update && apt-get install -y 1password-cli && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
 # Install Go from the official tarball. apt golang-go is too old for
 # gascity's go.mod (requires Go 1.25.0+).
 RUN ARCH=$(dpkg --print-architecture) && \

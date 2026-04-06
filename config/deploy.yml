@@ -31,6 +31,7 @@ env:
     - ANTHROPIC_API_KEY
     - GH_APP_PEM
     - FIREWORKS_AI_API_KEY
+    - OP_SERVICE_ACCOUNT_TOKEN
 
 builder:
   arch: amd64
