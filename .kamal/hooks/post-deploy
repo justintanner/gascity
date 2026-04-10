@@ -1,0 +1,21 @@
+#!/bin/sh
+# After a successful deploy, log gh inside the running container as the
+# justintanner-gc[bot] GitHub App. All auth material (PEM, App ID,
+# Installation ID) is already in the container's env via config/deploy.yml
+# env.secret / env.clear; we just trigger the login script in place.
+#
+# Runs locally on the deployer. Does not mint any tokens itself — the
+# minting and `gh auth login` happen inside the container.
+#
+# Note: GitHub App installation tokens expire ~60 minutes after issue.
+# This hook fires on every deploy, so each deploy re-authenticates for
+# roughly the next hour. To refresh manually without a full deploy:
+#   kamal app exec --reuse "/app/gascity/scripts/gh-app-login.sh"
+
+set -e
+
+echo "==> Logging gh into container as justintanner-gc[bot]..."
+kamal app exec --reuse "/app/gascity/scripts/gh-app-login.sh"
+
+echo "==> Ensuring nakedapi rig is cloned..."
+kamal app exec --reuse "[ -d /gc/nakedapi ] || git clone https://github.com/justintanner/nakedapi.git /gc/nakedapi"
