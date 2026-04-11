@@ -42,13 +42,13 @@ else
 fi
 
 # --- Clone rig repos into /gc volume ---
-if [ ! -d /gc/nakedapi ]; then
-    if [ -n "${GH_APP_PEM:-}" ]; then
-        /app/gascity/scripts/gh-app-login.sh || echo "warning: GitHub auth failed; trying public clone"
-    fi
-    echo "Cloning nakedapi rig..."
-    git clone https://github.com/justintanner/nakedapi.git /gc/nakedapi \
-        || echo "warning: nakedapi clone failed; register rig later via kamal shell"
+# apicity is a public repo, so the initial clone needs no auth. GH App
+# auth is still used at agent runtime so endpoint-builder can push PRs
+# under the bot identity via `gh pr create`.
+if [ ! -d /gc/apicity ]; then
+    echo "Cloning apicity rig..."
+    git clone https://github.com/justintanner/apicity.git /gc/apicity \
+        || echo "warning: apicity clone failed; register rig later via kamal shell"
 fi
 
 # --- Bootstrap or resume /gc workspace ---

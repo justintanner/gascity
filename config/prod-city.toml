@@ -36,6 +36,8 @@ port = 9443
 bind = "127.0.0.1"
 
 [[rigs]]
-name = "na"
-path = "/gc/nakedapi"
-includes = ["/app/gascity/examples/gastown/packs/gastown"]
+name = "apicity"
+path = "/gc/apicity"
+includes = ["/gc/apicity/gc/pack"]
+prefix = "ac"
+formulas_dir = "gc/pack/formulas"
