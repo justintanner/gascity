@@ -1,0 +1,55 @@
+service: gascity
+image: justintanner/gascity
+primary_role: controller
+
+servers:
+  controller:
+    hosts:
+      - 65.21.88.38
+    proxy:
+      host: superlzy.com
+      app_port: 8080
+      ssl: true
+      healthcheck:
+        path: /up
+        interval: 10
+        timeout: 5
+    options:
+      memory: 16g
+
+registry:
+  server: localhost:5555
+
+env:
+  clear:
+    GIT_USER: "jwt-gascity[bot]"
+    GIT_EMAIL: "jwt-gascity[bot]@users.noreply.github.com"
+    GH_APP_ID: "3209605"
+    GH_APP_INSTALLATION_ID: "119659593"
+    TERM: "xterm-256color"
+    ANTHROPIC_BASE_URL: "https://api.fireworks.ai/inference"
+    ANTHROPIC_MODEL: "accounts/fireworks/models/kimi-k2p5"
+    ANTHROPIC_SMALL_FAST_MODEL: "accounts/fireworks/models/kimi-k2p5"
+    ANTHROPIC_DEFAULT_SONNET_MODEL: "accounts/fireworks/models/kimi-k2p5"
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: "accounts/fireworks/models/kimi-k2p5"
+    ANTHROPIC_DEFAULT_OPUS_MODEL: "accounts/fireworks/models/kimi-k2p5"
+  secret:
+    - GH_APP_PEM
+    - FIREWORKS_AI_API_KEY
+    - ANTHROPIC_API_KEY
+    - OP_SERVICE_ACCOUNT_TOKEN
+
+builder:
+  arch: amd64
+
+volumes:
+  - gascity-workspace:/gc
+
+aliases:
+  shell: app exec --interactive --reuse "bash"
+  logs: app exec --reuse "tail -100 /gc/.gc/events.jsonl"
+  status: app exec --reuse "gc status"
+  agents: app exec --reuse "gc agent list"
+  beads: app exec --reuse "gc beads list"
+  formulas: app exec --reuse "gc formula list"
+  supervisor: app exec --reuse "gc supervisor status"

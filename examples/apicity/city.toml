@@ -1,0 +1,30 @@
+# Gas City managing the apicity TypeScript monorepo.
+#
+# The pack lives inside the apicity repo at ~/apicity/gc/pack so prompts
+# evolve in the same PR as CLAUDE.md. This city file just registers the
+# rig and points at that pack via an absolute path.
+#
+# To bring it up:
+#   eval $(op signin)                    # 1Password session
+#   pnpm -C /Users/jwt/apicity run check:op
+#   cd /Users/jwt/gascity/examples/apicity
+#   gc rig add /Users/jwt/apicity        # initializes .beads/ in apicity
+#   gc start                             # begin reconciling
+
+[workspace]
+name = "apicity"
+provider = "claude"
+
+[daemon]
+patrol_interval = "30s"
+max_restarts = 5
+restart_window = "1h"
+shutdown_timeout = "5s"
+
+[[rigs]]
+name = "apicity"
+path = "/Users/jwt/apicity"
+includes = ["/Users/jwt/apicity/gc/pack"]
+prefix = "ac"
+formulas_dir = "gc/pack/formulas"
+suspended = false

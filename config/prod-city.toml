@@ -1,0 +1,27 @@
+# Production city config baked into the gascity Docker image.
+#
+# This file is copied to /gc/city.toml on first boot only (because /gc
+# is a Kamal-managed Docker volume). After that, the server's copy is
+# the source of truth — edit it live via `kamal shell`.
+
+[workspace]
+name = "gc"
+provider = "claude"
+includes = ["/app/gascity/examples/gastown/packs/gastown"]
+
+[providers.claude]
+ready_delay_ms = 0
+[providers.claude.env]
+ANTHROPIC_BASE_URL = "https://api.fireworks.ai/inference"
+ANTHROPIC_MODEL = "accounts/fireworks/models/kimi-k2p5"
+ANTHROPIC_SMALL_FAST_MODEL = "accounts/fireworks/models/kimi-k2p5"
+ANTHROPIC_DEFAULT_SONNET_MODEL = "accounts/fireworks/models/kimi-k2p5"
+ANTHROPIC_DEFAULT_HAIKU_MODEL = "accounts/fireworks/models/kimi-k2p5"
+ANTHROPIC_DEFAULT_OPUS_MODEL = "accounts/fireworks/models/kimi-k2p5"
+
+[[rigs]]
+name = "apicity"
+path = "/gc/apicity"
+includes = ["/gc/apicity/gc/pack"]
+prefix = "ac"
+formulas_dir = "gc/pack/formulas"
